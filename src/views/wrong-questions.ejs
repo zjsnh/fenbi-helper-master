@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>错题本 · 粉笔助手</title>
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    body { background: var(--paper); }
+
+    /* 英雄区 — 水墨渐变 */
+    .page-hero {
+      background:
+        radial-gradient(ellipse at 25% 0%, rgba(0,102,204,0.06) 0%, transparent 55%),
+        radial-gradient(ellipse at 75% 100%, rgba(90,155,230,0.04) 0%, transparent 55%),
+        linear-gradient(180deg, var(--paper-warm) 0%, var(--paper) 100%);
+      padding: 40px 0 20px;
+      margin: -40px -28px 28px;
+      padding-left: 28px;
+      padding-right: 28px;
+      position: relative;
+      overflow: hidden;
+    }
+    .page-hero::before {
+      content: '';
+      position: absolute;
+      top: -30%;
+      left: -15%;
+      width: 130%;
+      height: 160%;
+      background: radial-gradient(circle at 50% 50%, rgba(0,102,204,0.03) 0%, transparent 45%);
+      animation: heroPulse 8s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes heroPulse {
+      0%, 100% { transform: scale(1); opacity: 0.6; }
+      50% { transform: scale(1.1); opacity: 1; }
+    }
+    .page-hero::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 28px; right: 28px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--g-300), transparent);
+      opacity: 0.4;
+    }
+    .page-hero .hero-title {
+      font-size: 26px;
+      font-weight: 800;
+      font-family: var(--font-display);
+      color: var(--g-800);
+      letter-spacing: -0.5px;
+      animation: titleRise 0.6s var(--ease-spring) both;
+      position: relative;
+      z-index: 1;
+    }
+    @keyframes titleRise {
+      from { opacity: 0; transform: translateY(20px) scale(0.9); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .page-hero .hero-sub {
+      font-size: 13px;
+      color: var(--ink-500);
+      margin-top: 6px;
+      animation: subFade 0.6s var(--ease-decel) 0.1s both;
+      position: relative;
+      z-index: 1;
+    }
+    @keyframes subFade {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* 面包屑 — 胶囊导航 */
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      animation: breadFade 0.5s var(--ease-out) 0.15s both;
+    }
+    @keyframes breadFade {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .breadcrumb .crumb {
+      color: var(--g-600);
+      cursor: pointer;
+      font-weight: 500;
+      text-decoration: none;
+      padding: 4px 12px;
+      border-radius: 20px;
+      transition: all 0.3s var(--ease-out);
+      background: var(--g-50);
+      border: 1px solid transparent;
+    }
+    .breadcrumb .crumb:hover { 
+      background: var(--g-100); 
+      color: var(--g-700);
+      border-color: var(--g-200);
+      transform: none;
+    }
+    .breadcrumb .crumb.current {
+      color: var(--ink-700);
+      cursor: default;
+      font-weight: 700;
+      background: var(--ink-100);
+      border-color: var(--border-light);
+    }
+    .breadcrumb .sep { color: var(--ink-400); font-size: 11px; }
+
+    /* 分类卡片网格 — 悬浮深度 */
+    .cat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px;
+    }
+    .cat-card {
+      background: var(--card);
+      border: 0.5px solid var(--border-light);
+      border-radius: var(--radius);
+      padding: 28px 24px 24px;
+      cursor: pointer;
+      transition: all 0.4s var(--ease-out);
+      box-shadow: var(--shadow-xs);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      animation: cardRise 0.5s var(--ease-out) both;
+    }
+    @keyframes cardRise {
+      from { opacity: 0; transform: translateY(24px) scale(0.95); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .cat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--g-300), var(--g-500));
+      opacity: 0;
+      transition: opacity 0.35s var(--ease-out);
+    }
+    .cat-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, var(--g-50) 0%, transparent 40%);
+      opacity: 0;
+      transition: opacity 0.35s var(--ease-out);
+      pointer-events: none;
+    }
+    .cat-card:hover::before { opacity: 1; }
+    .cat-card:hover::after { opacity: 1; }
+    .cat-card:hover {
+      box-shadow: var(--shadow);
+      border-color: var(--g-200);
+      transform: none;
+    }
+    .cat-card:active { transform: scale(0.98); }
+    .cat-card .cat-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 12px;
+      line-height: 1.4;
+      position: relative;
+      z-index: 1;
+    }
+    .cat-card .cat-count {
+      font-size: 36px;
+      font-weight: 800;
+      font-family: var(--font-display);
+      color: var(--g-600);
+      line-height: 1;
+      letter-spacing: -1.5px;
+      transition: transform 0.3s var(--ease-spring);
+      position: relative;
+      z-index: 1;
+    }
+    .cat-card:hover .cat-count { transform: scale(1.1); }
+    .cat-card .cat-sub {
+      font-size: 11px;
+      color: var(--text-ter);
+      margin-top: 8px;
+      letter-spacing: 0.3px;
+      position: relative;
+      z-index: 1;
+    }
+    .cat-card .cat-actions {
+      margin-top: 16px;
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      position: relative;
+      z-index: 1;
+    }
+    .cat-card .cat-export-btn {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--g-600);
+      background: var(--g-50);
+      border: 0.5px solid var(--g-200);
+      border-radius: 8px;
+      padding: 6px 18px;
+      cursor: pointer;
+      transition: all 0.3s var(--ease-out);
+      font-family: inherit;
+    }
+    .cat-card .cat-export-btn:hover {
+      background: var(--g-200);
+      border-color: var(--g-400);
+      color: var(--g-800);
+      transform: none;
+      box-shadow: var(--shadow-xs);
+    }
+    .cat-card .cat-export-btn:active { transform: translateY(0) scale(0.97); }
+
+    /* 题目卡片 — 墨迹侧线 */
+    .q-card {
+      background: var(--card);
+      border: 0.5px solid var(--border-light);
+      border-radius: var(--radius);
+      padding: 28px 32px;
+      margin-bottom: 10px;
+      box-shadow: var(--shadow-xs);
+      transition: all 0.4s var(--ease-out);
+      position: relative;
+      animation: qCardSlide 0.5s var(--ease-out) both;
+    }
+    @keyframes qCardSlide {
+      from { opacity: 0; transform: translateX(-20px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    .q-card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 16px; bottom: 16px;
+      width: 3px;
+      background: linear-gradient(180deg, var(--g-300), var(--g-500));
+      border-radius: 0 2px 2px 0;
+      opacity: 0;
+      transition: opacity 0.35s var(--ease-out);
+    }
+    .q-card:hover::before { opacity: 1; }
+    .q-card:hover {
+      box-shadow: var(--shadow);
+      border-color: var(--g-200);
+      transform: translateX(6px);
+    }
+
+    .q-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .q-num {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--g-600);
+      background: var(--g-50);
+      padding: 4px 16px;
+      border-radius: 20px;
+      letter-spacing: 0.5px;
+      border: 0.5px solid var(--g-100);
+    }
+    .q-body {
+      font-size: 15px;
+      color: var(--text);
+      line-height: 1.95;
+      margin-bottom: 18px;
+    }
+    .q-body img { max-width: 100%; border-radius: 8px; margin: 10px 0; }
+
+    .q-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .q-opt {
+      font-size: 14px;
+      color: var(--text-sec);
+      padding: 12px 18px;
+      border-radius: var(--radius-sm);
+      background: var(--ink-100);
+      border: 1px solid transparent;
+      transition: all 0.3s var(--ease-out);
+    }
+    .q-opt:hover { background: var(--card-hover); border-color: var(--border-light); }
+    .q-opt.correct {
+      background: var(--success-light);
+      color: #2d7a30;
+      font-weight: 600;
+      border-color: #b8ddb0;
+    }
+
+    .q-answer {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--success);
+      margin-bottom: 12px;
+    }
+
+    .q-solution {
+      font-size: 14px;
+      color: var(--text-sec);
+      line-height: 1.9;
+      background: var(--paper-warm);
+      border: 0.5px solid var(--border-light);
+      border-radius: var(--radius-sm);
+      padding: 18px 22px;
+      margin-top: 14px;
+    }
+
+    .q-footer {
+      display: flex;
+      gap: 12px;
+      font-size: 11px;
+      color: var(--text-ter);
+      margin-top: 16px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .q-footer a {
+      color: var(--g-600);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 12px;
+      transition: color 0.2s;
+    }
+    .q-footer a:hover { text-decoration: underline; color: var(--g-500); }
+    .q-tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 20px;
+      background: var(--g-50);
+      color: var(--g-700);
+      border: 0.5px solid var(--g-100);
+    }
+
+    /* ── 搜索栏 ── */
+    .wq-search-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      animation: fadeUp 0.5s var(--ease-decel) 0.1s both;
+    }
+    .wq-search-bar .wq-search-input {
+      flex: 1;
+      padding: 12px 20px 12px 44px;
+      font-size: 15px;
+      border-radius: var(--radius);
+      border: 2px solid var(--border);
+      background: var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E") 14px center no-repeat;
+      transition: all 0.3s var(--ease-out);
+      box-shadow: var(--shadow-xs);
+      outline: none;
+      font-family: inherit;
+    }
+    .wq-search-bar .wq-search-input:focus {
+      border-color: var(--g-400);
+      box-shadow: 0 0 0 4px rgba(0,102,204,0.12), var(--shadow-sm);
+    }
+    .wq-search-bar .wq-search-clear {
+      display: none;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: none;
+      background: var(--ink-100);
+      color: var(--ink-500);
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    .wq-search-bar .wq-search-clear:hover {
+      background: var(--ink-200);
+      color: var(--ink-700);
+    }
+    .wq-search-bar .wq-search-clear.visible { display: flex; align-items: center; justify-content: center; }
+    .wq-search-hint {
+      font-size: 12px;
+      color: var(--text-ter);
+      margin-top: -16px;
+      margin-bottom: 20px;
+      padding-left: 4px;
+    }
+
+    /* 搜索结果高亮 */
+    .cat-card .cat-name mark {
+      background: var(--g-200);
+      color: var(--g-800);
+      font-weight: 700;
+      border-radius: 3px;
+      padding: 0 2px;
+    }
+
+    .empty-hint {
+      text-align: center;
+      padding: 80px 20px;
+      color: var(--text-ter);
+      font-size: 15px;
+      animation: fadeUp 0.5s var(--ease-decel);
+    }
+    .loading-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 80px;
+      gap: 14px;
+      color: var(--text-ter);
+      font-size: 15px;
+    }
+
+    /* 同步按钮 — 旋转动画 */
+    .sync-card {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .sync-card:hover .sync-icon { transform: rotate(180deg); }
+    .sync-icon {
+      font-size: 32px;
+      color: var(--g-400);
+      transition: transform 0.6s var(--ease-out);
+      display: inline-block;
+    }
+
+    /* ── 题目头部工具栏 ── */
+    .q-header-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding: 20px 24px;
+      background: var(--card);
+      border: 0.5px solid var(--border-light);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-xs);
+      margin-bottom: 20px;
+      animation: fadeUp 0.4s var(--ease-decel) both;
+    }
+    .q-header-bar h2 {
+      font-size: 18px;
+      font-weight: 700;
+      font-family: var(--font-display);
+      color: var(--ink-800);
+      margin: 0;
+    }
+    .q-total {
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--ink-400);
+      font-family: var(--font-body);
+    }
+
+    /* ── 模板选择器 ── */
+    .template-tabs {
+      display: inline-flex;
+      gap: 0;
+      background: var(--ink-100);
+      border-radius: 10px;
+      padding: 3px;
+    }
+    .template-tab {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink-500);
+      padding: 6px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s var(--ease-out);
+      user-select: none;
+    }
+    .template-tab:hover { color: var(--ink-700); }
+    .template-tab.active {
+      background: var(--card);
+      color: var(--g-700);
+      font-weight: 700;
+      box-shadow: var(--shadow-xs);
+    }
+
+    /* ── 导出面板 ── */
+    .export-panel {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--paper-warm);
+      border: 0.5px solid var(--border-light);
+      border-radius: 10px;
+      padding: 6px 14px;
+    }
+    .export-panel label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ink-500);
+    }
+    .export-panel input[type="number"] {
+      width: 56px;
+      padding: 5px 8px;
+      font-size: 13px;
+      font-weight: 600;
+      border: 0.5px solid var(--border-light);
+      border-radius: 6px;
+      background: var(--card);
+      color: var(--ink-800);
+      text-align: center;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .export-panel input[type="number"]:focus {
+      border-color: var(--g-300);
+      box-shadow: 0 0 0 4px rgba(0,102,204,0.15);
+    }
+    .export-panel .sep {
+      font-size: 12px;
+      color: var(--ink-400);
+    }
+    .export-panel .btn-success {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 18px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--g-500), var(--g-600));
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      transition: all 0.3s var(--ease-out);
+      box-shadow: 0 2px 8px rgba(0,102,204,0.25);
+    }
+    .export-panel .btn-success:hover {
+      background: linear-gradient(135deg, var(--g-400), var(--g-500));
+      transform: none;
+      box-shadow: 0 4px 12px rgba(0,102,204,0.35);
+    }
+    .export-panel .btn-success:active {
+      transform: translateY(0) scale(0.97);
+    }
+
+    /* ── 导出模态框 ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15,17,13,0.45);
+      backdrop-filter: blur(6px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: overlayIn 0.25s var(--ease-out) both;
+    }
+    @keyframes overlayIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    .modal-box {
+      background: var(--card);
+      border: 0.5px solid var(--border-light);
+      border-radius: 16px;
+      padding: 32px;
+      width: 420px;
+      max-width: 90vw;
+      box-shadow: var(--shadow-lg);
+      animation: modalPop 0.35s var(--ease-spring) both;
+    }
+    @keyframes modalPop {
+      from { opacity: 0; transform: scale(0.9) translateY(20px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .modal-box h3 {
+      font-size: 18px;
+      font-weight: 700;
+      font-family: var(--font-display);
+      color: var(--ink-800);
+      margin: 0 0 24px;
+    }
+    .modal-section {
+      margin-bottom: 20px;
+    }
+    .modal-section .modal-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--ink-500);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 10px;
+    }
+    .modal-tpl-row {
+      display: flex;
+      gap: 8px;
+    }
+    .modal-tpl-btn {
+      flex: 1;
+      padding: 12px 0;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 600;
+      border: 2px solid var(--border-light);
+      border-radius: 10px;
+      background: var(--paper-warm);
+      color: var(--ink-600);
+      cursor: pointer;
+      transition: all 0.25s var(--ease-out);
+    }
+    .modal-tpl-btn:hover {
+      border-color: var(--g-200);
+      background: var(--g-50);
+      color: var(--g-700);
+    }
+    .modal-tpl-btn.active {
+      border-color: var(--g-500);
+      background: var(--g-50);
+      color: var(--g-700);
+      box-shadow: 0 0 0 3px rgba(0,102,204,0.12);
+    }
+    .modal-range-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .modal-range-row input[type="number"] {
+      flex: 1;
+      padding: 10px 12px;
+      font-size: 15px;
+      font-weight: 600;
+      border: 2px solid var(--border-light);
+      border-radius: 10px;
+      background: var(--paper);
+      color: var(--ink-800);
+      text-align: center;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .modal-range-row input[type="number"]:focus {
+      border-color: var(--g-400);
+      box-shadow: 0 0 0 4px rgba(0,102,204,0.15);
+    }
+    .modal-range-row .sep {
+      font-size: 14px;
+      color: var(--ink-400);
+      font-weight: 600;
+    }
+    .modal-range-hint {
+      font-size: 11px;
+      color: var(--ink-400);
+      margin-top: 6px;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 24px;
+    }
+    .modal-btn {
+      flex: 1;
+      padding: 12px 0;
+      font-size: 14px;
+      font-weight: 700;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.25s var(--ease-out);
+      font-family: inherit;
+    }
+    .modal-btn-cancel {
+      background: var(--ink-100);
+      color: var(--ink-600);
+    }
+    .modal-btn-cancel:hover { background: var(--ink-200); }
+    .modal-btn-export {
+      background: linear-gradient(135deg, var(--g-500), var(--g-600));
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(0,102,204,0.25);
+    }
+    .modal-btn-export:hover {
+      background: linear-gradient(135deg, var(--g-400), var(--g-500));
+      transform: none;
+      box-shadow: 0 4px 12px rgba(0,102,204,0.35);
+    }
+    .modal-btn-export:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .modal-btn-export .spinner-sm {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<div class="navbar">
+  <a href="/history-category-complex" class="logo"><img src="/image.png" alt="">粉笔助手</a>
+  <a href="/history-category-complex">练习记录</a>
+  <a href="/history">列表视图</a>
+  <a href="/wrong-questions" class="active">错题本</a>
+  <a href="/word-frequency">词语统计</a>
+  <a href="/setup" style="margin-left:auto;">切换账号</a>
+</div>
+
+<div class="container-wide">
+  <!-- 页面头部 -->
+  <div class="page-hero">
+    <div class="hero-title">错题本</div>
+    <div class="hero-sub">按知识点分类整理，针对性复习</div>
+  </div>
+
+  <!-- 统计卡片 -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="num"><%= total %></div>
+      <div class="lbl">错题总数</div>
+    </div>
+    <div class="stat-card">
+      <div class="num" id="cat-count"><%= categories.length %></div>
+      <div class="lbl">分类数量</div>
+    </div>
+    <% if (cachedAt) { %>
+    <div class="stat-card">
+      <div class="num" style="font-size:18px;" id="cache-time"><%= new Date(cachedAt).toLocaleString('zh-CN') %></div>
+      <div class="lbl">数据更新时间</div>
+    </div>
+    <% } %>
+    <div class="stat-card sync-card" onclick="refreshData()" title="清除缓存并重新同步粉笔网数据">
+      <div style="text-align:center;">
+        <div class="sync-icon" id="sync-icon">&#x21BB;</div>
+        <div class="lbl" id="sync-label">手动同步</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 搜索栏 -->
+  <div class="wq-search-bar">
+    <input class="wq-search-input" id="wqSearchInput" type="text" placeholder="按分类名称搜索错题..." autocomplete="off">
+    <button class="wq-search-clear" id="wqSearchClear" title="清除搜索">&#x2715;</button>
+  </div>
+  <div class="wq-search-hint" id="wqSearchHint">输入关键词模糊匹配分类名称，实时筛选</div>
+
+  <!-- 面包屑 -->
+  <div class="breadcrumb" id="breadcrumb">
+    <span class="crumb current">全部分类</span>
+  </div>
+
+  <!-- 动态内容区 -->
+  <div id="main-content"></div>
+</div>
+
+<script>
+  var CATEGORIES = <%- JSON.stringify(categories) %>;
+  var navStack = [];
+  var currentNodeList = CATEGORIES;
+  var currentPath = [];
+
+  renderCategories(CATEGORIES, []);
+
+  function renderCategories(nodes, path) {
+    currentNodeList = nodes;
+    currentPath = path;
+    updateBreadcrumb();
+
+    var container = document.getElementById('main-content');
+    container.innerHTML = '';
+
+    if (!nodes || nodes.length === 0) {
+      container.innerHTML = '<div class="empty-hint">此分类暂无错题</div>';
+      return;
+    }
+
+    var html = '<div class="cat-grid stagger">';
+    nodes.forEach(function(node, idx) {
+      var hasChildren = node.children && node.children.length > 0;
+      html += '<div class="cat-card" style="animation-delay:' + (idx * 0.05) + 's" data-node=\'' + JSON.stringify({
+        id: node.id,
+        name: node.name,
+        count: node.count,
+        hasChildren: !!hasChildren
+      }) + '\' onclick="handleCardClick(this)">';
+      html += '<div class="cat-name">' + node.name + '</div>';
+      html += '<div class="cat-count">' + node.count + '</div>';
+      html += '<div class="cat-sub">' + (hasChildren ? '点击查看子分类' : node.count + ' 道错题') + '</div>';
+      if (node.count > 0) {
+        html += '<div class="cat-actions">';
+        html += '<button class="cat-export-btn" onclick="event.stopPropagation();quickExport(' + node.id + ', \'' + escapeHtml(node.name) + '\', ' + node.count + ')">导出 PDF</button>';
+        html += '</div>';
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+    document.getElementById('cat-count').textContent = nodes.length;
+  }
+
+  // ── 模糊搜索逻辑 ──
+  var searchTimer = null;
+
+  // 将分类树扁平化为所有节点列表（含完整路径）
+  function flattenCategories(nodes, parentPath) {
+    var result = [];
+    if (!nodes) return result;
+    nodes.forEach(function(node) {
+      var fullPath = parentPath ? (parentPath + ' > ' + node.name) : node.name;
+      result.push({
+        id: node.id,
+        name: node.name,
+        fullPath: fullPath,
+        count: node.count,
+        hasChildren: !!(node.children && node.children.length > 0),
+        children: node.children || []
+      });
+      if (node.children && node.children.length > 0) {
+        result = result.concat(flattenCategories(node.children, fullPath));
+      }
+    });
+    return result;
+  }
+
+  // 高亮匹配文字
+  function highlightText(text, keyword) {
+    if (!keyword) return text;
+    var escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    var regex = new RegExp('(' + escaped + ')', 'gi');
+    return text.replace(regex, '<mark>$1</mark>');
+  }
+
+  // 执行搜索
+  function doSearch(keyword) {
+    var clearBtn = document.getElementById('wqSearchClear');
+    var hint = document.getElementById('wqSearchHint');
+    var container = document.getElementById('main-content');
+    var breadcrumb = document.getElementById('breadcrumb');
+
+    if (!keyword || !keyword.trim()) {
+      clearBtn.classList.remove('visible');
+      hint.textContent = '输入关键词模糊匹配分类名称，实时筛选';
+      breadcrumb.style.display = '';
+      goHome();
+      return;
+    }
+
+    clearBtn.classList.add('visible');
+    breadcrumb.style.display = 'none';
+
+    var kw = keyword.trim().toLowerCase();
+    var allNodes = flattenCategories(CATEGORIES, '');
+
+    // 模糊匹配：节点名称或完整路径包含关键词
+    var matched = allNodes.filter(function(node) {
+      return node.name.toLowerCase().indexOf(kw) !== -1
+          || node.fullPath.toLowerCase().indexOf(kw) !== -1;
+    });
+
+    hint.textContent = '找到 ' + matched.length + ' 个匹配分类';
+
+    if (matched.length === 0) {
+      container.innerHTML = '<div class="empty-hint"><div style="font-size:48px;opacity:0.3;margin-bottom:20px;">&#x1F50D;</div>未找到与「' + escapeHtml(keyword.trim()) + '」匹配的分类</div>';
+      return;
+    }
+
+    var html = '<div class="cat-grid stagger">';
+    matched.forEach(function(node, idx) {
+      html += '<div class="cat-card" style="animation-delay:' + (idx * 0.05) + 's" data-node=\'' + JSON.stringify({
+        id: node.id,
+        name: node.name,
+        count: node.count,
+        hasChildren: node.hasChildren
+      }) + '\' onclick="handleCardClick(this)">';
+      html += '<div class="cat-name">' + highlightText(node.name, keyword.trim()) + '</div>';
+      html += '<div class="cat-count">' + node.count + '</div>';
+      html += '<div class="cat-sub" style="font-size:10px;color:var(--ink-400);">' + highlightText(node.fullPath, keyword.trim()) + '</div>';
+      if (node.count > 0) {
+        html += '<div class="cat-actions">';
+        html += '<button class="cat-export-btn" onclick="event.stopPropagation();quickExport(' + node.id + ', \'' + escapeHtml(node.name) + '\', ' + node.count + ')">导出 PDF</button>';
+        html += '</div>';
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+    document.getElementById('cat-count').textContent = matched.length;
+  }
+
+  // 绑定搜索事件
+  var wqSearchInput = document.getElementById('wqSearchInput');
+  var wqSearchClear = document.getElementById('wqSearchClear');
+
+  wqSearchInput.addEventListener('input', function() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function() {
+      doSearch(wqSearchInput.value);
+    }, 200);
+  });
+
+  wqSearchInput.addEventListener('keydown', function(e) {
+    if (e.keyCode === 13) {
+      clearTimeout(searchTimer);
+      doSearch(wqSearchInput.value);
+    }
+  });
+
+  wqSearchClear.addEventListener('click', function() {
+    wqSearchInput.value = '';
+    wqSearchClear.classList.remove('visible');
+    doSearch('');
+    wqSearchInput.focus();
+  });
+
+  function handleCardClick(el) {
+    var data = JSON.parse(el.getAttribute('data-node'));
+    var node = findNodeById(currentNodeList, data.id);
+
+    if (node && node.children && node.children.length > 0) {
+      navStack.push({ nodeList: currentNodeList, path: currentPath.slice() });
+      renderCategories(node.children, currentPath.concat([{ id: node.id, name: node.name }]));
+    } else {
+      navStack.push({ nodeList: currentNodeList, path: currentPath.slice() });
+      loadQuestions(data.id, data.name, currentPath.concat([{ id: data.id, name: data.name }]));
+    }
+  }
+
+  function findNodeById(nodes, id) {
+    if (!nodes) return null;
+    for (var i = 0; i < nodes.length; i++) {
+      if (nodes[i].id === id) return nodes[i];
+      if (nodes[i].children) {
+        var found = findNodeById(nodes[i].children, id);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  function updateBreadcrumb() {
+    var bc = document.getElementById('breadcrumb');
+    var html = '';
+    if (navStack.length > 0) {
+      html += '<span class="crumb" onclick="goHome()">全部分类</span>';
+    } else {
+      html += '<span class="crumb current">全部分类</span>';
+    }
+    currentPath.forEach(function(seg, i) {
+      html += '<span class="sep">&#x203A;</span>';
+      if (i < currentPath.length - 1) {
+        html += '<span class="crumb" onclick="popTo(' + i + ')">' + seg.name + '</span>';
+      } else {
+        html += '<span class="crumb current">' + seg.name + '</span>';
+      }
+    });
+    bc.innerHTML = html;
+  }
+
+  function goHome() {
+    navStack = [];
+    currentPath = [];
+    renderCategories(CATEGORIES, []);
+  }
+
+  function popTo(index) {
+    while (navStack.length > index + 1) {
+      navStack.pop();
+    }
+    if (navStack.length > 0) {
+      var prev = navStack.pop();
+      currentPath = prev.path.slice(0, index + 1);
+      renderCategories(prev.nodeList, currentPath.slice(0, index + 1));
+    } else {
+      goHome();
+    }
+  }
+
+  var currentQuestions = [];
+  var currentKeypointId = null;
+  var currentCatName = '';
+
+  function loadQuestions(keypointId, name, path) {
+    currentKeypointId = keypointId;
+    currentCatName = name;
+    currentPath = path;
+    updateBreadcrumb();
+
+    var container = document.getElementById('main-content');
+    container.innerHTML = '<div class="loading-wrap"><span class="spinner"></span>加载题目中...</div>';
+
+    fetch('/api/wrong-questions/' + keypointId)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        currentQuestions = data.questions || [];
+        renderQuestionList();
+      })
+      .catch(function() {
+        container.innerHTML = '<div class="empty-hint" style="color:var(--danger);">加载失败，请重试</div>';
+      });
+  }
+
+  function renderQuestionList() {
+    var container = document.getElementById('main-content');
+    var qs = currentQuestions;
+
+    if (!qs.length) {
+      container.innerHTML = '<div class="empty-hint">此分类暂无题目数据</div>';
+      return;
+    }
+
+    var labels = ['A','B','C','D','E','F'];
+    var html = '';
+
+    html += '<div style="margin-bottom:16px;">';
+    html += '<button class="btn btn-ghost btn-sm" onclick="goBackFromQuestions()">&#x2190; 返回分类</button>';
+    html += '</div>';
+
+    html += '<div class="q-header-bar">';
+    html += '<div><h2>' + currentCatName + ' <span class="q-total">共 ' + qs.length + ' 道错题</span></h2></div>';
+    html += '<button class="btn-success" onclick="openExportModal()" style="font-size:13px;font-weight:700;padding:8px 22px;border-radius:10px;border:none;cursor:pointer;background:linear-gradient(135deg,var(--g-500),var(--g-600));color:#fff;box-shadow:0 2px 8px rgba(0,102,204,0.25);transition:all 0.3s var(--ease-out);">导出 PDF</button>';
+    html += '</div>';
+
+    qs.forEach(function(q, i) {
+      html += '<div class="q-card" style="animation-delay:' + (i * 0.04) + 's">';
+      html += '<div class="q-header">';
+      html += '<span class="q-num">第 ' + (i + 1) + ' 题</span>';
+      if (q.difficulty) html += '<span style="font-size:11px;color:var(--text-ter);">难度 ' + q.difficulty + '</span>';
+      html += '</div>';
+      html += '<div class="q-body">' + q.content + '</div>';
+      
+      if (q.options && q.options.length > 0) {
+        html += '<div class="q-options">';
+        q.options.forEach(function(opt, oi) {
+          var isCorrect = q.answer && q.answer.indexOf(labels[oi]) !== -1;
+          html += '<div class="q-opt' + (isCorrect ? ' correct' : '') + '">' + labels[oi] + '. ' + opt + '</div>';
+        });
+        html += '</div>';
+      }
+      
+      if (q.answer) {
+        html += '<div class="q-answer">正确答案：' + q.answer + '</div>';
+      }
+      
+      if (q.solution) {
+        html += '<div class="q-solution">' + q.solution + '</div>';
+      }
+      
+      html += '<div class="q-footer">';
+      if (q.source) html += '<span>来源：' + q.source + '</span>';
+      if (q.analysis) html += '<a href="javascript:void(0)" onclick="showAnalysis(' + i + ')">查看解析</a>';
+      html += '</div>';
+      html += '</div>';
+    });
+
+    container.innerHTML = html;
+  }
+
+  function goBackFromQuestions() {
+    if (navStack.length > 0) {
+      var prev = navStack.pop();
+      currentPath = prev.path;
+      renderCategories(prev.nodeList, currentPath);
+    }
+  }
+
+  // ── 导出模态框 ──
+  function openExportModal() {
+    if (currentQuestions.length === 0) return;
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'export-modal';
+    overlay.onclick = function(e) { if (e.target === overlay) closeExportModal(); };
+    overlay.innerHTML =
+      '<div class="modal-box">' +
+        '<h3>导出 PDF</h3>' +
+        '<div class="modal-section">' +
+          '<div class="modal-label">题目范围</div>' +
+          '<div class="modal-range-row">' +
+            '<input type="number" id="m-export-start" min="1" max="' + currentQuestions.length + '" value="1">' +
+            '<span class="sep">~</span>' +
+            '<input type="number" id="m-export-end" min="1" max="' + currentQuestions.length + '" value="' + currentQuestions.length + '">' +
+          '</div>' +
+          '<div class="modal-range-hint">共 ' + currentQuestions.length + ' 道题，支持导出 1 ~ ' + currentQuestions.length + '</div>' +
+        '</div>' +
+        '<div class="modal-actions">' +
+          '<button class="modal-btn modal-btn-cancel" onclick="closeExportModal()">取消</button>' +
+          '<button class="modal-btn modal-btn-export" id="m-export-btn" onclick="submitExport()">导出 PDF</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+  }
+
+  function closeExportModal() {
+    var m = document.getElementById('export-modal');
+    if (m) m.remove();
+  }
+
+  function submitExport() {
+    var start = parseInt(document.getElementById('m-export-start').value) || 1;
+    var end = parseInt(document.getElementById('m-export-end').value) || currentQuestions.length;
+    if (start < 1 || end > currentQuestions.length || start > end) {
+      alert('请输入有效的题号范围（1 ~ ' + currentQuestions.length + '）');
+      return;
+    }
+    var btn = document.getElementById('m-export-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-sm"></span>生成中...';
+    fetch('/api/wrong-questions/pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keypointId: currentKeypointId, start: start, end: end })
+    })
+    .then(function(r) {
+      if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || '导出失败'); });
+      return r.blob();
+    })
+    .then(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = currentCatName + '.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      closeExportModal();
+    })
+    .catch(function(e) {
+      alert('导出失败：' + e.message);
+      btn.disabled = false;
+      btn.innerHTML = '导出 PDF';
+    });
+  }
+
+  function quickExport(id, name, count) {
+    // 先获取题目数据，再打开模态框
+    currentKeypointId = id;
+    currentCatName = name;
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'export-modal';
+    overlay.onclick = function(e) { if (e.target === overlay) closeExportModal(); };
+    overlay.innerHTML =
+      '<div class="modal-box">' +
+        '<h3>导出 PDF</h3>' +
+        '<div style="text-align:center;padding:20px 0;color:var(--ink-400);font-size:14px;">' +
+          '<span class="spinner" style="display:inline-block;width:20px;height:20px;border:2px solid var(--border-light);border-top-color:var(--g-500);border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle;margin-right:8px;"></span>' +
+          '正在加载题目数据...' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+
+    fetch('/api/wrong-questions/' + id)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        currentQuestions = data.questions || [];
+        if (currentQuestions.length === 0) {
+          closeExportModal();
+          alert('该分类暂无题目数据');
+          return;
+        }
+        // 重建模态框
+        closeExportModal();
+        openExportModal();
+      })
+      .catch(function() {
+        closeExportModal();
+        alert('加载题目数据失败，请重试');
+      });
+  }
+
+  function refreshData() {
+    if (confirm('确定要清除缓存并重新同步数据吗？')) {
+      location.reload();
+    }
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/'/g, "\\'").replace(/"/g, '\\"');
+  }
+</script>
+</body>
+</html>

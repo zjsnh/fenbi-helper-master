@@ -1,0 +1,166 @@
+<!-- project-shell.html — shared navigation partial for fenbi-helper -->
+<!-- SLOT: activeNavItem — set [data-active="true"] on the current page's nav link -->
+
+<style>
+  /* ── Nav Shell (scoped to #app-shell) ── */
+  #app-shell {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(245, 245, 247, 0.72);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 0.5px solid var(--apple-border, rgba(0, 0, 0, 0.08));
+  }
+
+  #app-shell-inner {
+    width: 100%;
+    max-width: 1024px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    height: 100%;
+  }
+
+  /* ── Brand ── */
+  .app-brand {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    color: var(--apple-foreground);
+    font-family: var(--font-sans), "DM Sans", system-ui, sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+  }
+
+  .app-brand svg {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+  }
+
+  /* ── Nav Links ── */
+  .app-nav-links {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .app-nav-links a {
+    font-family: var(--font-sans), "DM Sans", system-ui, sans-serif;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1;
+    color: var(--apple-text-500, rgba(0, 0, 0, 0.56));
+    text-decoration: none;
+    white-space: nowrap;
+    transition: color 0.2s ease;
+    padding: 4px 0;
+  }
+
+  .app-nav-links a:hover {
+    color: var(--apple-foreground);
+  }
+
+  .app-nav-links a[data-active="true"] {
+    color: var(--apple-foreground);
+    font-weight: 500;
+  }
+
+  /* ── Utility Side ── */
+  .app-nav-utility {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .app-nav-utility button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--apple-text-500, rgba(0, 0, 0, 0.56));
+    cursor: pointer;
+    transition: color 0.2s ease, background 0.2s ease;
+  }
+
+  .app-nav-utility button:hover {
+    color: var(--apple-foreground);
+    background: var(--apple-muted, rgba(0, 0, 0, 0.04));
+  }
+
+  .app-nav-utility button svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .user-avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--apple-brand-600, #0066cc);
+    color: #fff;
+    font-family: var(--font-sans), "DM Sans", system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: box-shadow 0.2s ease;
+  }
+
+  .user-avatar:hover {
+    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.2);
+  }
+</style>
+
+<nav id="app-shell" role="navigation" aria-label="Main navigation">
+  <div id="app-shell-inner">
+
+    <!-- Brand -->
+    <a href="./index.html" class="app-brand" aria-label="粉笔助手">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
+        <path d="M8 7h6"/>
+        <path d="M8 11h4"/>
+      </svg>
+      <span>粉笔助手</span>
+    </a>
+
+    <!-- Nav Links -->
+    <!-- SLOT: activeNavItem — set [data-active="true"] on the current page -->
+    <ul class="app-nav-links">
+      <li><a href="./history.html" data-active="true">练习历史</a></li>
+      <li><a href="./wrong-questions.html">错题本</a></li>
+      <li><a href="./search.html">搜索</a></li>
+    </ul>
+
+    <!-- Utility -->
+    <div class="app-nav-utility">
+      <button aria-label="通知" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+          <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+        </svg>
+      </button>
+      <div class="user-avatar" aria-label="用户菜单" role="button" tabindex="0">U</div>
+    </div>
+
+  </div>
+</nav>

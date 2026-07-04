@@ -1,0 +1,467 @@
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>题目详情 · 粉笔助手</title>
+  <link rel="stylesheet" href="/theme.css">
+  <link rel="stylesheet" href="/easymde.min.css">
+  <link rel="stylesheet" href="/custom-input.css">
+  <script src="/easymde.min.js"></script>
+  <style>
+    body { background: var(--paper); }
+
+    /* 页面头部 — 水墨渐变 */
+    .q-hero {
+      background:
+        radial-gradient(ellipse at 20% 0%, rgba(0,102,204,0.06) 0%, transparent 55%),
+        radial-gradient(ellipse at 80% 100%, rgba(90,155,230,0.04) 0%, transparent 55%),
+        linear-gradient(180deg, var(--paper-warm) 0%, var(--paper) 100%);
+      padding: 24px 0 22px;
+      margin: -28px -24px 32px;
+      padding-left: 24px;
+      padding-right: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+    .q-hero::before {
+      content: '';
+      position: absolute;
+      top: -40%;
+      right: -20%;
+      width: 100%;
+      height: 180%;
+      background: radial-gradient(circle at 50% 50%, rgba(0,102,204,0.03) 0%, transparent 45%);
+      animation: heroFloat 10s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes heroFloat {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(-20px, 20px); }
+    }
+    .q-hero::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 24px; right: 24px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--g-300), transparent);
+      opacity: 0.4;
+    }
+    .q-hero .hero-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--g-600);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 8px;
+      animation: labelFade 0.5s var(--ease-decel) both;
+      position: relative;
+      z-index: 1;
+    }
+    @keyframes labelFade {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .q-hero .hero-title {
+      font-size: 22px;
+      font-weight: 800;
+      font-family: var(--font-display);
+      color: var(--g-800);
+      letter-spacing: -0.3px;
+      animation: titleRise 0.6s var(--ease-spring) 0.08s both;
+      position: relative;
+      z-index: 1;
+    }
+    @keyframes titleRise {
+      from { opacity: 0; transform: translateY(16px) scale(0.95); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .q-hero .hero-tags {
+      margin-top: 12px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      animation: tagsSlide 0.6s var(--ease-out) 0.15s both;
+      position: relative;
+      z-index: 1;
+    }
+    @keyframes tagsSlide {
+      from { opacity: 0; transform: translateX(-16px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    /* 题目卡片增强 */
+    .quz-item {
+      animation: cardReveal 0.6s var(--ease-out) 0.2s both;
+    }
+
+    /* 操作栏 — 毛玻璃 */
+    .action-strip {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 16px 0;
+      margin-bottom: 12px;
+      animation: stripRise 0.5s var(--ease-out) 0.25s both;
+      background: rgba(255,255,255,0.5);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      border: 0.5px solid var(--border-light);
+    }
+    @keyframes stripRise {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .action-strip .solution-btn {
+      margin-right: 0;
+    }
+
+    /* 解析展开区域 */
+    .ans-panel {
+      overflow: hidden;
+      transition: max-height 0.5s var(--ease-out), opacity 0.4s var(--ease-out);
+    }
+    .ans-panel.hidden {
+      max-height: 0 !important;
+      opacity: 0;
+    }
+
+    /* 视频容器 */
+    .video-wrap {
+      margin: 0 0 24px;
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      animation: videoRise 0.5s var(--ease-out) both;
+    }
+    @keyframes videoRise {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .video-wrap video {
+      display: block;
+      width: 100%;
+      max-width: 480px;
+      border-radius: var(--radius);
+    }
+
+    /* 笔记区 — 纸张质感 */
+    .note-section {
+      background: var(--g-50);
+      border: 0.5px solid var(--g-100);
+      border-radius: var(--radius);
+      padding: 24px 28px;
+      margin: 20px 0;
+      box-shadow: var(--shadow-xs);
+    }
+    .note-section .note-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .note-section .note-label strong {
+      color: var(--g-700);
+      font-size: 15px;
+      font-family: var(--font-display);
+      font-weight: 700;
+    }
+
+    /* 我的答案 — 高亮框 */
+    .my-answer-block {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 20px;
+      background: var(--paper-warm);
+      border: 2px solid var(--border-light);
+      border-radius: var(--radius-sm);
+      font-size: 15px;
+      color: var(--text-sec);
+      margin-bottom: 20px;
+      box-shadow: var(--shadow-xs);
+    }
+    .my-answer-block b { 
+      color: var(--g-700); 
+      font-size: 18px;
+      font-weight: 800;
+    }
+
+    /* 词语标签行 */
+    .word-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+      animation: wordFade 0.5s var(--ease-decel) 0.12s both;
+    }
+    @keyframes wordFade {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── 内容区入场动画 ── */
+    .action-strip {
+      animation: fadeUp 0.4s var(--ease-out) 0.2s both;
+    }
+    .note-section {
+      animation: fadeUp 0.5s var(--ease-out) 0.25s both;
+    }
+    .quz-item {
+      animation: cardReveal 0.5s var(--ease-out) both;
+    }
+    .quz-item:nth-child(1) { animation-delay: 0.3s; }
+    .quz-item:nth-child(2) { animation-delay: 0.36s; }
+    .quz-item:nth-child(3) { animation-delay: 0.42s; }
+    .quz-item:nth-child(n+4) { animation-delay: 0.48s; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes cardReveal {
+      from { opacity: 0; transform: translateY(14px) scale(0.98); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="page-wrap">
+  <!-- 页面头部 -->
+  <div class="q-hero">
+    <div class="hero-label">题目详情</div>
+    <div class="hero-title">题目 #<%= q.id %></div>
+    <div class="hero-tags">
+      <% for (let i=0; i<4 && i<(q.keypoints||[]).concat(q.tags||[]).length; i++) { %>
+        <span class="quz-tag"><%= q.keypoints.concat(q.tags)[i] %></span>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- 词语 -->
+  <% if (q.wordList) { %>
+  <div class="word-row">
+    <% for (let i=0; i<q.wordList.length; i++) { %>
+      <span class="quz-tag-word" onclick="fetchZjWord('<%= q.wordList[i] %>')"><%= q.wordList[i] %></span>
+    <% } %>
+  </div>
+  <% } %>
+
+  <!-- 题目 -->
+  <div class="quz-item" id="<%= q.id %>">
+    <div class="quz-title-correct noselect">
+      <span><%= q.source %></span>
+      <span class="quz-tag-group">
+        <span class="quz-tag-collect" style="display:<%= q.hasCollect?'inline':'none' %>" id="quz-tag-collect-<%= q.id %>">收藏</span>
+        <span class="quz-tag-note" style="display:<%= (q.note&&q.note!==''&&!['[方法]','[积累]','[例题]','[反思]','[总结]'].some(e=>q.note.includes(e)))?'inline':'none' %>" id="quz-tag-note-<%= q.id %>">笔记</span>
+        <% if (q.note&&q.note.length&&q.note.includes('[方法]')) { %><span class="quz-tag-note-method">方法</span><% } %>
+        <% if (q.note&&q.note.length&&q.note.includes('[积累]')) { %><span class="quz-tag-note-acc">积累</span><% } %>
+        <% if (q.note&&q.note.length&&q.note.includes('[例题]')) { %><span class="quz-tag-note-acc">例题</span><% } %>
+        <% if (q.note&&q.note.length&&(q.note.includes('[反思]')||q.note.includes('[总结]'))) { %><span class="quz-tag-note-rethink"><%= q.note.includes('[反思]')?'反思':'总结' %></span><% } %>
+        <span class="quz-tag-<%= q.correctRatio>80?1:q.correctRatio>60?2:q.correctRatio>40?3:q.correctRatio>20?4:5 %>">正确率 <%= q.correctRatio.toFixed(2) %>%</span>
+        <span class="quz-tag"><%= q.totalCount %></span>
+      </span>
+    </div>
+
+    <div class="quz-content-fold" id="quz-content-<%= q.id %>">
+      <% if (q.material) { %><div class="quz-content"><%- q.material %></div><% } %>
+      <span class="quz-idx"><%- q.idx %>.</span>
+      <div class="quz-content"><%- q.content %></div>
+      <div class="quz-options">
+        <% for (let i=0; i<q.options.length; i++) { %>
+          <% if (q.options[i].startsWith('<p>')) { %>
+            <div><%= ['A','B','C','D'][i]+'. ' %><%- q.options[i].replace(/^<p>/g,'').replace(/<\/p>$/g,'') %></div>
+          <% } else { %>
+            <div><%= ['A','B','C','D'][i]+'. ' %><%- q.options[i] %></div>
+          <% } %>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <!-- 操作按钮 -->
+  <div class="action-strip">
+    <a class="solution-btn ripple" id="show-ans-<%= q.id %>" href="javascript:showSolution(<%= q.id %>);">查看解析</a>
+    <a class="solution-btn ripple" id="show-comment-<%= q.id %>" href="javascript:showComment(<%= q.id %>);">查看评论</a>
+    <a class="solution-btn ripple" id="show-video-<%= q.id %>" href="javascript:showVideoSolution(<%= q.id %>);">视频解析</a>
+    <a class="solution-btn ripple" id="collect-<%= q.id %>" href="javascript:collect(<%= q.id %>);"><%= q.hasCollect?'取消收藏':'收藏' %></a>
+    <a class="solution-btn ripple" id="copy-<%= q.id %>" href="javascript:copyContent(<%= q.id %>);">复制</a>
+    <a class="solution-btn ripple" target="_blank" href="https://www.fenbi.com/spa/tiku/report/preview/xingce/xingce/questions?questionIds=<%= q.id %>&fromType=1">粉笔地址</a>
+  </div>
+
+  <div class="video-wrap" id="video-wrap-<%= q.id %>" style="display:none;">
+    <video id="video-<%= q.id %>" controls></video>
+  </div>
+  <ul class="comment-list" id="comment-<%= q.id %>"></ul>
+
+  <div class="ans-panel hidden" id="ans-<%= q.id %>">
+    <div class="note-section">
+      <div class="note-label">
+        <strong>笔记</strong>
+        <a class="solution-btn" id="save-note-<%= q.id %>" href="javascript:saveNote(<%= q.id %>);">保存笔记</a>
+      </div>
+      <div><textarea id="mdNote-<%= q.id %>"></textarea></div>
+      <span id="note-<%= q.id %>" style="display:none;" class="note-area"><%= q.note %></span>
+    </div>
+    <div class="my-answer-block">
+      我的选择：<b><%= q.myAnswer %></b>
+    </div>
+    <%- q.solution %>
+  </div>
+</div>
+
+<script>
+  // ── Scroll entrance animations ──
+  (function(){
+    var els = document.querySelectorAll('.anim-in');
+    if(!els.length) return;
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){ e.target.classList.add('visible'); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+    els.forEach(function(el){ io.observe(el); });
+  })();
+
+  function showSolution(questionId) {
+    var el = document.getElementById('ans-' + questionId);
+    var btn = document.getElementById('show-ans-' + questionId);
+    if (el.classList.contains('hidden')) {
+      el.classList.remove('hidden');
+      el.style.maxHeight = el.scrollHeight + 'px';
+      btn.innerHTML = '收起解析';
+    } else {
+      el.classList.add('hidden');
+      btn.innerHTML = '查看解析';
+    }
+  }
+
+  function showComment(questionId) {
+    var comment = document.getElementById('comment-' + questionId);
+    if (comment.style.display === 'none') {
+      if (comment.innerHTML) {
+        comment.style.display = 'block';
+        comment.classList.add('slide-down');
+        document.getElementById('show-comment-'+questionId).innerHTML = '收起评论';
+        return;
+      }
+      fetch('/api/comment/'+questionId)
+        .then(function(r){ return r.ok?r.json():null; })
+        .then(function(datas){
+          if(!datas) return;
+          document.getElementById('show-comment-'+questionId).innerHTML = '收起评论';
+          datas.forEach(function(d){
+            var li = document.createElement('li');
+            li.innerText = d.comment + ' (' + d.likeCount + ')';
+            comment.appendChild(li);
+          });
+          comment.style.display = 'block';
+          comment.classList.add('slide-down');
+        });
+    } else {
+      document.getElementById('show-comment-'+questionId).innerHTML = '查看评论';
+      comment.style.display = 'none';
+      comment.classList.remove('slide-down');
+    }
+  }
+
+  function showVideoSolution(questionId) {
+    var video = document.getElementById('video-' + questionId);
+    var wrap = document.getElementById('video-wrap-' + questionId);
+    if (wrap.style.display === 'none') {
+      if (video.currentSrc) { wrap.style.display = 'block'; return; }
+      fetch('/api/video/'+questionId)
+        .then(function(r){ return r.ok?r.text():null; })
+        .then(function(url){
+          if(!url) return;
+          document.getElementById('show-video-'+questionId).innerHTML = '收起视频';
+          var source = document.createElement('source');
+          source.type = 'video/mp4'; source.src = url;
+          video.appendChild(source);
+          wrap.style.display = 'block';
+          wrap.classList.add('slide-down');
+        });
+    } else {
+      video.pause();
+      wrap.style.display = 'none';
+      wrap.classList.remove('slide-down');
+      document.getElementById('show-video-'+questionId).innerHTML = '视频解析';
+    }
+  }
+
+  function collect(questionId) {
+    var tag = document.getElementById('quz-tag-collect-'+questionId);
+    var btn = document.getElementById('collect-'+questionId);
+    if (tag.style.display === 'none') {
+      fetch('/api/collect/'+questionId, {method:'POST'})
+        .then(function(r){ if(r.ok){ tag.style.display='inline'; btn.innerHTML='取消收藏'; } });
+    } else {
+      fetch('/api/collect/'+questionId, {method:'DELETE'})
+        .then(function(r){ if(r.ok){ tag.style.display='none'; btn.innerHTML='收藏'; } });
+    }
+  }
+
+  function copyContent(questionId) {
+    var str = document.getElementById(questionId).innerHTML;
+    function listener(e){ e.clipboardData.setData('text/html',str); e.clipboardData.setData('text/plain',str); e.preventDefault(); }
+    document.addEventListener('copy', listener);
+    document.execCommand('copy');
+    document.removeEventListener('copy', listener);
+    showToast('已复制到剪贴板');
+  }
+
+  function showToast(msg) {
+    var t = document.createElement('div');
+    t.className = 'toast toast--success';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(function(){ t.style.opacity = '0'; t.style.transform = 'translateX(-50%) translateY(-10px)'; }, 1800);
+    setTimeout(function(){ t.remove(); }, 2200);
+  }
+
+  var mdOptions = {
+    autofocus: true, forceSync: true, autoRefresh: {delay: 300},
+    hideIcons: ['guide','heading'], minHeight: '250px', maxHeight: '250px',
+    parsingConfig: {allowAtxHeaderWithoutSpace: true, strikethrough: false, underscoresBreakWords: true},
+    placeholder: '请输入笔记', showIcons: ['code','table'], spellChecker: false,
+    status: false, styleSelectedText: false, sideBySideFullscreen: false,
+    syncSideBySidePreviewScroll: false, tabSize: 4, toolbarTips: false
+  };
+
+  var mdeMap = {};
+  function genMdNote(){
+    var ids = [].slice.call(arguments);
+    ids.forEach(function(questionId){
+      var el = document.getElementById('mdNote-'+questionId);
+      if (!el) return;
+      var easyMDE = new EasyMDE(Object.assign({}, mdOptions, {element: el}));
+      mdeMap[questionId] = easyMDE;
+      var content = document.getElementById('note-'+questionId).innerText;
+      if (content.length > 0) { easyMDE.value(content); easyMDE.togglePreview(); }
+    });
+  }
+
+  function saveNote(questionId) {
+    var noteContent = mdeMap[questionId].value();
+    fetch('/api/saveNote/'+questionId, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({noteContent: noteContent})
+    }).then(function(r){
+      if (!r.ok) { showToast('笔记保存失败'); return; }
+      showToast('笔记已保存');
+      return r.json();
+    });
+  }
+
+  genMdNote(<%= q.id %>);
+
+  function fetchZjWord(word) {
+    fetch('/api/zj', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({word:word})})
+      .then(function(r){ return r.ok?r.text():null; })
+      .then(function(res){ if(res) window.open(res,'_blank'); });
+  }
+</script>
+</body>
+</html>

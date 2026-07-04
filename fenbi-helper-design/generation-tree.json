@@ -1,0 +1,67 @@
+{
+  "nodeId": "gen-project-shell",
+  "kind": "project-shell",
+  "pageIds": [],
+  "output": "partials/project-shell.html",
+  "sharedRegions": ["sticky frosted-glass nav", "root layout frame", "brand CSS link"],
+  "privateRegions": [],
+  "mutableSlots": ["activeNavItem"],
+  "status": "planned",
+  "children": [
+    {
+      "nodeId": "gen-page-login",
+      "kind": "page-leaf",
+      "pageIds": ["page-login"],
+      "output": "pages/login.html",
+      "sharedRegions": [],
+      "privateRegions": ["full page content"],
+      "mutableSlots": [],
+      "status": "planned",
+      "children": []
+    },
+    {
+      "nodeId": "gen-page-history",
+      "kind": "page-leaf",
+      "pageIds": ["page-history"],
+      "output": "pages/history.html",
+      "sharedRegions": [],
+      "privateRegions": ["full page content"],
+      "mutableSlots": [],
+      "status": "planned",
+      "children": []
+    },
+    {
+      "nodeId": "gen-page-question",
+      "kind": "page-leaf",
+      "pageIds": ["page-question"],
+      "output": "pages/question.html",
+      "sharedRegions": [],
+      "privateRegions": ["full page content"],
+      "mutableSlots": [],
+      "status": "planned",
+      "children": []
+    },
+    {
+      "nodeId": "gen-page-wrong-questions",
+      "kind": "page-leaf",
+      "pageIds": ["page-wrong-questions"],
+      "output": "pages/wrong-questions.html",
+      "sharedRegions": [],
+      "privateRegions": ["full page content"],
+      "mutableSlots": [],
+      "status": "planned",
+      "children": []
+    },
+    {
+      "nodeId": "gen-page-search",
+      "kind": "page-leaf",
+      "pageIds": ["page-search"],
+      "output": "pages/search.html",
+      "sharedRegions": [],
+      "privateRegions": ["full page content"],
+      "mutableSlots": [],
+      "status": "planned",
+      "children": []
+    }
+  ]
+}

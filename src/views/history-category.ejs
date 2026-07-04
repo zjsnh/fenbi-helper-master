@@ -1,0 +1,143 @@
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>练习记录 · 粉笔助手</title>
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    body { background: var(--paper); }
+
+    .cat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 18px;
+      padding: 28px;
+    }
+    .cat-block {
+      background: var(--card);
+      border: 0.5px solid var(--border-light);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow-xs);
+      animation: catFloat 0.55s var(--ease-decel) both;
+      transition: all 0.35s var(--ease);
+      position: relative;
+      overflow: hidden;
+    }
+    .cat-block::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--g-300), var(--g-500));
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.4s var(--ease);
+    }
+    .cat-block:hover::before { transform: scaleX(1); }
+    .cat-block:hover {
+      box-shadow: var(--shadow);
+      border-color: var(--g-200);
+      transform: none;
+    }
+    .cat-block h3 {
+      font-size: 16px;
+      font-weight: 700;
+      font-family: var(--font-display);
+      color: var(--g-700);
+      padding-bottom: 10px;
+      margin-bottom: 10px;
+      border-bottom: 2px solid var(--g-100);
+    }
+    .ex-row {
+      display: flex;
+      align-items: center;
+      padding: 8px 10px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.25s var(--ease);
+      border-radius: 6px;
+      gap: 8px;
+      position: relative;
+    }
+    .ex-row:hover {
+      color: var(--g-700);
+      background: var(--g-50);
+      transform: translateX(4px);
+    }
+    .ex-row .title {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ex-row .date {
+      font-size: 11px;
+      color: var(--text-ter);
+      white-space: nowrap;
+    }
+
+    /* ── 入场动画增强 ── */
+    .cat-block {
+      animation: cardRise 0.5s var(--ease-out) both;
+    }
+    .cat-block:nth-child(1) { animation-delay: 0.08s; }
+    .cat-block:nth-child(2) { animation-delay: 0.16s; }
+    .cat-block:nth-child(3) { animation-delay: 0.24s; }
+    .cat-block:nth-child(4) { animation-delay: 0.32s; }
+    @keyframes cardRise {
+      from { opacity: 0; transform: translateY(14px) scale(0.98); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+  </style>
+</head>
+<body>
+<div class="navbar">
+  <a href="/history-category-complex" class="logo"><img src="/image.png" alt="">粉笔助手</a>
+  <a href="/history-category-complex" class="active">练习记录</a>
+  <a href="/history">列表视图</a>
+  <a href="/wrong-questions">错题本</a>
+  <a href="/word-frequency">词语统计</a>
+  <a href="/setup" style="margin-left:auto;">切换账号</a>
+</div>
+
+<div class="cat-grid">
+  <% if (exerciseHistory.length==0) { %><script>window.location='/setup'</script><% } %>
+  <% var blockIdx = 0; %>
+  <% for (let group of Object.keys(exerciseHistoryGroup)) { %>
+    <div class="cat-block" style="animation-delay:<%= blockIdx * 0.06 %>s">
+      <h3><%= group %></h3>
+      <% for (let h of exerciseHistoryGroup[group]) { %>
+        <div class="ex-row" onclick="showReport(<%= h.id %>)">
+          <span class="title" title="<%= h.cleanName %>">
+            <%= h.cleanName %>
+          </span>
+          <span style="font-size:10px;color:var(--g-600);font-weight:600;"><%= h.answerCount %>题</span>
+          <span style="font-size:10px;color:var(--success);font-weight:700;"><%= h.correctRate %>%</span>
+          <span class="date"><%= h.finishedDate %></span>
+        </div>
+      <% } %>
+    </div>
+    <% blockIdx++; %>
+  <% } %>
+</div>
+
+<script>
+// ── Scroll entrance animations ──
+(function(){
+  var els = document.querySelectorAll('.anim-in');
+  if(!els.length) return;
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){ e.target.classList.add('visible'); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+  els.forEach(function(el){ io.observe(el); });
+})();
+
+  function showReport(id) { window.location = '/exercise/'+id; }
+</script>
+</body>
+</html>

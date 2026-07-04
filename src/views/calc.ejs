@@ -1,0 +1,574 @@
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>速算练习 · 粉笔助手</title>
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    body { background: var(--paper); }
+
+    .calc-wrap {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 0 28px;
+    }
+
+    /* 英雄区 — 数字律动 */
+    .calc-hero {
+      background:
+        radial-gradient(ellipse at 30% 0%, rgba(0,102,204,0.06) 0%, transparent 55%),
+        radial-gradient(ellipse at 70% 100%, rgba(90,155,230,0.04) 0%, transparent 55%),
+        linear-gradient(180deg, var(--paper-warm) 0%, var(--paper) 100%);
+      padding: 40px 0 24px;
+      margin: -28px -28px 32px;
+      padding-left: 28px;
+      padding-right: 28px;
+      position: relative;
+      text-align: center;
+      overflow: hidden;
+    }
+    .calc-hero::before {
+      content: '';
+      position: absolute;
+      top: -30%;
+      left: -10%;
+      width: 120%;
+      height: 160%;
+      background: radial-gradient(circle at 50% 50%, rgba(0,102,204,0.03) 0%, transparent 45%);
+      animation: heroPulse 6s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes heroPulse {
+      0%, 100% { transform: scale(1); opacity: 0.6; }
+      50% { transform: scale(1.1); opacity: 1; }
+    }
+    .calc-hero::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 28px; right: 28px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--g-300), transparent);
+      opacity: 0.4;
+    }
+    .calc-hero h1 {
+      font-size: 28px;
+      font-weight: 800;
+      font-family: var(--font-display);
+      color: var(--g-800);
+      letter-spacing: -0.5px;
+      animation: titleRise 0.6s var(--ease-spring) both;
+      position: relative;
+      z-index: 1;
+    }
+    @keyframes titleRise {
+      from { opacity: 0; transform: translateY(20px) scale(0.9); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .calc-hero .sub {
+      font-size: 13px;
+      color: var(--ink-500);
+      margin-top: 8px;
+      animation: subFade 0.6s var(--ease-decel) 0.1s both;
+      position: relative;
+      z-index: 1;
+    }
+    @keyframes subFade {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* 控制栏 — 毛玻璃质感 */
+    .ctrl-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 28px;
+      animation: ctrlSlide 0.5s var(--ease-out) 0.15s both;
+      background: rgba(255,255,255,0.6);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 16px 20px;
+      border-radius: var(--radius);
+      border: 0.5px solid var(--border-light);
+      box-shadow: var(--shadow-sm);
+    }
+    @keyframes ctrlSlide {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .ctrl-bar label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink-700);
+      letter-spacing: 0.3px;
+    }
+    .ctrl-bar .bit-input {
+      width: 60px;
+      padding: 10px 12px;
+      font-size: 16px;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      text-align: center;
+      border: 2px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--card);
+      color: var(--g-700);
+      outline: none;
+      transition: all 0.3s var(--ease-out);
+    }
+    .ctrl-bar .bit-input:hover {
+      border-color: var(--g-300);
+    }
+    .ctrl-bar .bit-input:focus {
+      border-color: var(--g-400);
+      box-shadow: 0 0 0 4px rgba(0,102,204,0.1);
+    }
+
+    /* 运算类型按钮组 — 滑块切换 */
+    .op-group {
+      display: flex;
+      gap: 4px;
+      background: var(--ink-100);
+      border-radius: var(--radius-sm);
+      padding: 4px;
+      position: relative;
+    }
+    .op-btn {
+      padding: 10px 22px;
+      font-size: 15px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background: transparent;
+      color: var(--ink-500);
+      transition: all 0.3s var(--ease-out);
+      position: relative;
+      z-index: 1;
+    }
+    .op-btn:hover {
+      color: var(--g-600);
+      background: var(--g-50);
+    }
+    .op-btn.active {
+      background: var(--card);
+      color: var(--g-700);
+      box-shadow: var(--shadow-sm);
+      transform: scale(1.05);
+    }
+    .op-btn:active { transform: scale(0.95); }
+
+    /* 题目列表 — 卡片容器 */
+    .task-list {
+      background: var(--card);
+      border: 0.5px solid var(--border-light);
+      border-radius: var(--radius);
+      padding: 28px 32px;
+      box-shadow: var(--shadow-xs);
+      margin-bottom: 24px;
+      animation: taskRise 0.5s var(--ease-out) 0.2s both;
+      transition: all 0.4s var(--ease-out);
+    }
+    @keyframes taskRise {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .task-list:hover { box-shadow: var(--shadow); border-color: var(--g-200); }
+
+    .question {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--ink-100);
+      animation: qFade 0.4s var(--ease-out) both;
+      transition: all 0.3s var(--ease-out);
+    }
+    @keyframes qFade {
+      from { opacity: 0; transform: translateX(-12px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    .question:last-child { border-bottom: none; }
+    .question:hover { 
+      background: linear-gradient(90deg, var(--g-50) 0%, transparent 40%);
+      border-radius: 8px;
+      padding-left: 12px;
+      padding-right: 12px;
+    }
+
+    .q-expr {
+      font-family: var(--font-mono);
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--ink-900);
+      min-width: 170px;
+      letter-spacing: 0.5px;
+    }
+    .q-eq {
+      color: var(--g-400);
+      font-weight: 300;
+      margin: 0 4px;
+      font-size: 20px;
+    }
+    .q-input {
+      width: 92px;
+      padding: 10px 14px;
+      font-size: 17px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      text-align: center;
+      border: 2px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--paper);
+      color: var(--ink-900);
+      outline: none;
+      transition: all 0.3s var(--ease-out);
+    }
+    .q-input:hover {
+      border-color: var(--g-300);
+    }
+    .q-input:focus {
+      border-color: var(--g-400);
+      box-shadow: 0 0 0 4px rgba(0,102,204,0.1);
+      background: var(--card);
+    }
+    .q-input.correct-input {
+      border-color: var(--success);
+      background: var(--success-light);
+      color: var(--success);
+      animation: correctPulse 0.5s var(--ease-spring);
+    }
+    @keyframes correctPulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+    .q-input.wrong-input {
+      border-color: var(--danger);
+      background: var(--danger-light);
+      color: var(--danger);
+      animation: wrongShake 0.4s var(--ease-out);
+    }
+    @keyframes wrongShake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-6px); }
+      75% { transform: translateX(6px); }
+    }
+
+    .q-result {
+      font-size: 15px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      min-width: 52px;
+      text-align: center;
+      animation: resultPop 0.4s var(--ease-spring) both;
+    }
+    @keyframes resultPop {
+      from { opacity: 0; transform: scale(0.5); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    .q-result.right { color: var(--success); }
+    .q-result.wrong { color: var(--danger); }
+
+    /* 提交行 */
+    .submit-row {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      margin-bottom: 36px;
+      animation: submitRise 0.5s var(--ease-out) 0.3s both;
+    }
+    @keyframes submitRise {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* 计时器 — 数字跳动 */
+    .timer-display {
+      text-align: center;
+      font-size: 13px;
+      color: var(--ink-400);
+      margin-bottom: 24px;
+      animation: timerFade 0.5s var(--ease-decel) 0.18s both;
+    }
+    @keyframes timerFade {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    .timer-display b {
+      color: var(--g-600);
+      font-size: 20px;
+      font-family: var(--font-mono);
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      display: inline-block;
+      animation: timerTick 0.3s var(--ease-spring) infinite;
+    }
+    @keyframes timerTick {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+
+    /* 结果统计 — 分数展示 */
+    .result-banner {
+      text-align: center;
+      padding: 32px;
+      background: var(--card);
+      border: 0.5px solid var(--border-light);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      margin-bottom: 24px;
+      animation: resultRise 0.6s var(--ease-spring) both;
+      position: relative;
+      overflow: hidden;
+    }
+    @keyframes resultRise {
+      from { opacity: 0; transform: translateY(24px) scale(0.9); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .result-banner::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--g-300), var(--g-500), var(--g-300));
+    }
+    .result-banner .score {
+      font-size: 56px;
+      font-weight: 800;
+      font-family: var(--font-display);
+      letter-spacing: -2px;
+      line-height: 1;
+      animation: scoreCount 0.8s var(--ease-spring) 0.2s both;
+    }
+    @keyframes scoreCount {
+      from { opacity: 0; transform: scale(0.3); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    .result-banner .score.perfect { color: var(--success); }
+    .result-banner .score.good { color: var(--g-500); }
+    .result-banner .score.poor { color: var(--danger); }
+    .result-banner .score-label {
+      font-size: 14px;
+      color: var(--ink-500);
+      margin-top: 12px;
+      font-weight: 500;
+    }
+
+    /* ── 内容区入场动画 ── */
+    .ctrl-bar {
+      animation: fadeUp 0.4s var(--ease-out) 0.15s both;
+    }
+    .task-list {
+      animation: fadeUp 0.5s var(--ease-out) 0.2s both;
+    }
+    .result-banner {
+      animation: scaleIn 0.4s var(--ease-spring) 0.1s both;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes scaleIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="navbar">
+  <a href="/history-category-complex" class="logo"><img src="/image.png" alt="">粉笔助手</a>
+  <a href="/history-category-complex">练习记录</a>
+  <a href="/wrong-questions">错题本</a>
+  <a href="/calc" class="active">速算</a>
+</div>
+
+<div class="calc-wrap">
+  <div class="calc-hero">
+    <h1>速算练习</h1>
+    <div class="sub">心算训练，提升数字敏感度</div>
+  </div>
+
+  <div class="ctrl-bar">
+    <label>位数</label>
+    <input class="bit-input" type="text" id="bitNum" value="2">
+    <div class="op-group">
+      <button class="op-btn active" id="nextAdd">+</button>
+      <button class="op-btn" id="nextSub">&minus;</button>
+      <button class="op-btn" id="nextMul">&times;</button>
+      <button class="op-btn" id="nextDiv">&divide;</button>
+    </div>
+  </div>
+
+  <div class="timer-display" id="timer">用时 <b id="timer-sec">0</b> 秒</div>
+
+  <div class="task-list" id="task"></div>
+
+  <div class="submit-row">
+    <button class="btn btn-primary btn-lg" id="submit">提交答案</button>
+  </div>
+
+  <div id="result-area"></div>
+</div>
+
+<script>
+  // ── Scroll entrance animations ──
+  (function(){
+    var els = document.querySelectorAll('.anim-in');
+    if(!els.length) return;
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){ e.target.classList.add('visible'); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+    els.forEach(function(el){ io.observe(el); });
+  })();
+
+  var beginTime = new Date();
+  var timerInterval = setInterval(function(){
+    var sec = Math.floor((Date.now() - beginTime) / 1000);
+    document.getElementById('timer-sec').textContent = sec;
+  }, 200);
+
+  document.getElementById('submit').addEventListener('click', function() {
+    clearInterval(timerInterval);
+    var task = document.getElementById('task');
+    var correct = 0;
+    var total = 0;
+    for (var i = 0; i < task.children.length; i++) {
+      var t = task.children[i];
+      total++;
+      var expr = t.children[0].innerText;
+      var result = eval(expr);
+      var isDiv = false;
+      if (('' + result).includes('.')) {
+        isDiv = true;
+        result = (result * 100).toPrecision(2);
+      }
+      var inp = t.children[1];
+      var existingResult = t.querySelector('.q-result');
+
+      if (Math.floor(result) !== Number.parseInt(inp.value)) {
+        inp.classList.add('wrong-input');
+        inp.classList.remove('correct-input');
+        if (existingResult) {
+          existingResult.className = 'q-result wrong';
+          existingResult.innerText = isDiv ? result + '%' : result;
+        } else {
+          var a = document.createElement('span');
+          a.className = 'q-result wrong';
+          a.innerText = isDiv ? result + '%' : result;
+          t.appendChild(a);
+        }
+      } else {
+        inp.classList.add('correct-input');
+        inp.classList.remove('wrong-input');
+        correct++;
+        if (existingResult) {
+          existingResult.className = 'q-result right';
+          existingResult.innerText = isDiv ? result + '%' : '\u2713';
+        } else {
+          var b = document.createElement('span');
+          b.className = 'q-result right';
+          b.innerText = '\u2713';
+          t.appendChild(b);
+        }
+      }
+    }
+
+    var pct = Math.round(correct / total * 100);
+    var scoreClass = pct === 100 ? 'perfect' : pct >= 70 ? 'good' : 'poor';
+    var scoreLabel = pct === 100 ? '满分通过' : pct >= 70 ? '继续加油' : '还需练习';
+    var area = document.getElementById('result-area');
+    area.innerHTML = '<div class="result-banner">' +
+      '<div class="score ' + scoreClass + '">' + pct + '%</div>' +
+      '<div class="score-label">' + correct + ' / ' + total + ' 正确 · ' + scoreLabel + '</div>' +
+    '</div>';
+  });
+
+  var opBtns = document.querySelectorAll('.op-btn');
+  for (var j = 0; j < opBtns.length; j++) {
+    opBtns[j].addEventListener('click', function() {
+      opBtns.forEach(function(b){ b.classList.remove('active'); });
+      this.classList.add('active');
+      document.getElementById('task').innerHTML = '';
+      document.getElementById('result-area').innerHTML = '';
+      newTask(Number.parseInt(document.getElementById('bitNum').value), this.id);
+      beginTime = new Date();
+      clearInterval(timerInterval);
+      timerInterval = setInterval(function(){
+        var sec = Math.floor((Date.now() - beginTime) / 1000);
+        document.getElementById('timer-sec').textContent = sec;
+      }, 200);
+    });
+  }
+
+  function gen(N) {
+    var str = '' + Math.floor(Math.random() * Math.pow(10, N));
+    while (str.length < N) { str += '' + Math.floor(Math.random() * 10); }
+    return str;
+  }
+
+  function genDiv(N) {
+    var a = gen(N);
+    var mArr = [0, 1, 2];
+    var M = mArr[Math.floor(Math.random() * mArr.length)];
+    var b = gen(N + M);
+    if (M === 0) {
+      if (a > b) return b + ' / ' + a;
+      else return a + ' / ' + b;
+    } else {
+      return a + ' / ' + b;
+    }
+  }
+
+  function genNormal(N, op) {
+    var a = gen(N);
+    var b = gen(N);
+    if (a < b) return b + ' ' + op + ' ' + a;
+    else return a + ' ' + op + ' ' + b;
+  }
+
+  function newTask(N, op) {
+    var task = document.getElementById('task');
+    for (var i = 0; i < 10; i++) {
+      var q = document.createElement('div');
+      q.className = 'question';
+      q.style.animationDelay = (i * 0.04) + 's';
+
+      var span = document.createElement('span');
+      span.className = 'q-expr';
+      if (op === 'nextAdd') span.innerText = genNormal(N, '+');
+      else if (op === 'nextSub') span.innerText = genNormal(N, '-');
+      else if (op === 'nextMul') span.innerText = genNormal(N, '*');
+      else if (op === 'nextDiv') span.innerText = genDiv(N);
+      q.appendChild(span);
+
+      var eq = document.createElement('span');
+      eq.className = 'q-eq';
+      eq.innerText = '=';
+      q.appendChild(eq);
+
+      var inp = document.createElement('input');
+      inp.className = 'q-input';
+      inp.id = 'ans-' + i;
+      inp.setAttribute('autocomplete', 'off');
+      q.appendChild(inp);
+
+      task.appendChild(q);
+    }
+    // 聚焦第一题
+    var first = document.getElementById('ans-0');
+    if (first) first.focus();
+  }
+
+  newTask(Number.parseInt(document.getElementById('bitNum').value), 'nextAdd');
+</script>
+</body>
+</html>

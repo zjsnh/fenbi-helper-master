@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>错题本 - 粉笔助手</title>
+    <style id="theme-vars">
+/*
+ * Pinguo design tokens
+ * Brand: Pinguo
+ * Domain: Consumer imaging product
+ * Style: Restrained, elegant, Apple-inspired
+ * Theme mode: light-dark
+ * Source language: zh
+ * Output language: en
+ *
+ * Color architecture (two layers):
+ *   1. Primitive palette - six categories. brand / background / text / icon
+ *      are each a 10-step scale (50 lightest to 900 darkest). state-success and
+ *      state-error are functional colors anchored on Apple system colors.
+ *      Anchors follow Apple Human Interface Guidelines system colors
+ *      (System Blue #007AFF, System Green #34C759, System Red #FF3B30,
+ *      system grays / label / background colors).
+ *   2. Semantic tokens - :root (light) and .dark map roles onto primitives.
+ *      Components and UI kits must only consume the semantic tokens below.
+ */
+
+/* @group-priority: brand, background, text, icon, state-success, state-error */
+
+:root {
+  
+  /* solo-design consumption aliases: explicit prefix for fill-html-head.mjs */
+  --apple-background: var(--background, #ffffff);
+  --apple-foreground: var(--foreground, #0f172a);
+  --apple-card: var(--card, var(--background));
+  --apple-card-foreground: var(--card-foreground, var(--foreground));
+  --apple-popover: var(--popover, var(--card));
+  --apple-popover-foreground: var(--popover-foreground, var(--card-foreground, var(--foreground)));
+  --apple-primary: var(--primary, #111827);
+  --apple-primary-foreground: var(--primary-foreground, #ffffff);
+  --apple-secondary: var(--secondary, var(--muted, var(--card)));
+  --apple-secondary-foreground: var(--secondary-foreground, var(--foreground));
+  --apple-muted: var(--muted, var(--card));
+  --apple-muted-foreground: var(--muted-foreground, var(--foreground));
+  --apple-accent: var(--accent, var(--secondary, var(--muted, var(--card))));
+  --apple-accent-foreground: var(--accent-foreground, var(--foreground));
+  --apple-destructive: var(--destructive, #ef4444);
+  --apple-destructive-foreground: var(--destructive-foreground, #ffffff);
+  --apple-border: var(--border, currentColor);
+  --apple-input: var(--input, var(--border));
+  --apple-ring: var(--ring, var(--primary));
+  --apple-chart-1: var(--chart-1, var(--primary));
+  --apple-chart-2: var(--chart-2, var(--secondary, var(--primary)));
+  --apple-chart-3: var(--chart-3, var(--accent, var(--primary)));
+  --apple-chart-4: var(--chart-4, var(--muted-foreground, var(--foreground)));
+  --apple-chart-5: var(--chart-5, var(--foreground));
+  --apple-sidebar: var(--sidebar, var(--background));
+  --apple-sidebar-foreground: var(--sidebar-foreground, var(--foreground));
+  --apple-sidebar-primary: var(--sidebar-primary, var(--primary));
+  --apple-sidebar-primary-foreground: var(--sidebar-primary-foreground, var(--primary-foreground));
+  --apple-sidebar-accent: var(--sidebar-accent, var(--accent, var(--muted, var(--card))));
+  --apple-sidebar-accent-foreground: var(--sidebar-accent-foreground, var(--accent-foreground, var(--foreground)));
+
+/* ===== PRIMITIVE PALETTE ===== */
+
+  /* brand */
+  --brand-50: #e8f2ff;
+  --brand-100: #cfe5ff;
+  --brand-200: #9fcbff;
+  --brand-300: #66abff;
+  --brand-400: #2e8dff;
+  --brand-500: #007aff; /* @primary */
+  --brand-600: #0064d6;
+  --brand-700: #004fad;
+  --brand-800: #003b82;
+  --brand-900: #00275a;
+
+  /* background */
+  --background-50: #ffffff;
+  --background-100: #f7f7fa;
+  --background-200: #f2f2f7;
+  --background-300: #e5e5ea;
+  --background-400: #d1d1d6;
+  --background-500: #aeaeb2;
+  --background-600: #8e8e93;
+  --background-700: #3a3a3c;
+  --background-800: #1c1c1e;
+  --background-900: #000000;
+
+  /* text */
+  --text-50: #f5f5f7;
+  --text-100: #e3e3e8;
+  --text-200: #c7c7cc;
+  --text-300: #aeaeb2;
+  --text-400: #8e8e93;
+  --text-500: #6e6e73;
+  --text-600: #48484a;
+  --text-700: #3c3c43;
+  --text-800: #1d1d1f;
+  --text-900: #000000;
+
+  /* icon */
+  --icon-50: #f5f5f7;
+  --icon-100: #e5e5ea;
+  --icon-200: #d1d1d6;
+  --icon-300: #c7c7cc;
+  --icon-400: #aeaeb2;
+  --icon-500: #8e8e93;
+  --icon-600: #6e6e73;
+  --icon-700: #48484a;
+  --icon-800: #2c2c2e;
+  --icon-900: #1d1d1f;
+
+  /* state-success */
+  --state-success: #34c759; /* @primary */
+  --state-success-dark: #30d158;
+  --state-success-surface: #e9f9ee;
+  --state-success-foreground: #ffffff;
+
+  /* state-error */
+  --state-error: #ff3b30; /* @primary */
+  --state-error-dark: #ff453a;
+  --state-error-surface: #ffecea;
+  --state-error-foreground: #ffffff;
+
+  /* ===== SEMANTIC ROLES ===== */
+
+  /* semantic */
+  --background: var(--background-50);
+  --foreground: var(--text-800);
+  --card: var(--background-50);
+  --card-foreground: var(--text-800);
+  --popover: var(--background-50);
+  --popover-foreground: var(--text-900);
+
+  --primary: var(--brand-500);
+  --primary-foreground: var(--background-50);
+  --secondary: var(--background-200);
+  --secondary-foreground: var(--text-800);
+  --muted: var(--background-200);
+  --muted-foreground: var(--text-400);
+  --accent: var(--background-100);
+  --accent-foreground: var(--text-800);
+  --destructive: var(--state-error);
+  --destructive-foreground: var(--state-error-foreground);
+  --success: var(--state-success);
+  --success-foreground: var(--state-success-foreground);
+  --border: var(--background-300);
+  --input: var(--background-400);
+  --ring: var(--brand-500);
+
+  --icon: var(--icon-900);
+  --icon-muted: var(--icon-500);
+
+  /* chart */
+  --chart-1: var(--state-success);
+  --chart-2: var(--brand-500);
+  --chart-3: #ff9500;
+  --chart-4: #5856d6;
+  --chart-5: #af52de;
+
+  /* sidebar */
+  --sidebar: var(--background-200);
+  --sidebar-foreground: var(--text-800);
+  --sidebar-primary: var(--brand-500);
+  --sidebar-primary-foreground: var(--background-50);
+  --sidebar-accent: var(--background-300);
+  --sidebar-accent-foreground: var(--text-800);
+  --sidebar-border: var(--background-300);
+  --sidebar-ring: var(--brand-500);
+
+  /* TYPOGRAPHY */
+  --font-sans: DM Sans, ui-sans-serif, sans-serif, system-ui;
+  --font-serif: DM Sans, ui-sans-serif, sans-serif, system-ui;
+  --font-mono: JetBrains Mono, monospace;
+  --tracking-normal: 0em;
+
+  /* RADIUS */
+  --radius: 1.2rem;
+
+  /* SHADOWS */
+  --shadow-2xs: 0 1px 2px -1px rgba(0, 0, 0, 0.04); /* Hairline */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.04); /* Subtle */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05), 0 1px 3px -1px rgba(0, 0, 0, 0.05); /* Card */
+  --shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.05); /* Raised */
+  --shadow-md: 0 4px 8px -2px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.05); /* Card Hover */
+  --shadow-lg: 0 8px 24px -8px rgba(0, 0, 0, 0.08), 0 4px 8px -4px rgba(0, 0, 0, 0.05); /* Float */
+  --shadow-xl: 0 16px 40px -10px rgba(0, 0, 0, 0.10), 0 8px 16px -8px rgba(0, 0, 0, 0.06); /* Overlay */
+  --shadow-2xl: 0 24px 64px -12px rgba(0, 0, 0, 0.12); /* Modal */
+
+  /* SPACING */
+  --spacing: 0.24rem;
+}
+
+/* ===== SEMANTIC ROLES - dark (primitive palette inherited) ===== */
+.dark {
+  --background: var(--background-900);
+  --foreground: var(--text-50);
+  --card: var(--background-800);
+  --card-foreground: var(--text-50);
+  --popover: var(--background-700);
+  --popover-foreground: var(--text-50);
+
+  --primary: var(--brand-400);
+  --primary-foreground: var(--background-900);
+  --secondary: var(--background-800);
+  --secondary-foreground: var(--text-50);
+  --muted: var(--background-800);
+  --muted-foreground: var(--text-400);
+  --accent: var(--background-700);
+  --accent-foreground: var(--text-50);
+  --destructive: var(--state-error-dark);
+  --destructive-foreground: var(--state-error-foreground);
+  --success: var(--state-success-dark);
+  --success-foreground: var(--state-success-foreground);
+  --border: var(--background-700);
+  --input: var(--background-700);
+  --ring: var(--brand-400);
+
+  --icon: var(--icon-50);
+  --icon-muted: var(--icon-500);
+
+  --chart-1: var(--state-success-dark);
+  --chart-2: var(--brand-400);
+  --chart-3: #ff9f0a;
+  --chart-4: #5e5ce6;
+  --chart-5: #bf5af2;
+
+  --sidebar: var(--background-800);
+  --sidebar-foreground: var(--text-50);
+  --sidebar-primary: var(--brand-400);
+  --sidebar-primary-foreground: var(--background-900);
+  --sidebar-accent: var(--background-700);
+  --sidebar-accent-foreground: var(--text-50);
+  --sidebar-border: var(--background-700);
+  --sidebar-ring: var(--brand-400);
+
+  --shadow-2xs: 0 1px 2px -1px rgba(0, 0, 0, 0.30);
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.30);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.36), 0 1px 3px -1px rgba(0, 0, 0, 0.36);
+  --shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.40), 0 1px 2px -1px rgba(0, 0, 0, 0.36);
+  --shadow-md: 0 4px 8px -2px rgba(0, 0, 0, 0.44), 0 2px 4px -2px rgba(0, 0, 0, 0.36);
+  --shadow-lg: 0 8px 24px -8px rgba(0, 0, 0, 0.50), 0 4px 8px -4px rgba(0, 0, 0, 0.40);
+  --shadow-xl: 0 16px 40px -10px rgba(0, 0, 0, 0.55), 0 8px 16px -8px rgba(0, 0, 0, 0.44);
+  --shadow-2xl: 0 24px 64px -12px rgba(0, 0, 0, 0.60);
+}
+
+    </style>
+    <style id="component-vars">
+/* ═══════════════════════════════════════════════════════════════
+   components.css — Design System Component Definitions
+   Auto-extracted from preview/component-*.html
+   DO NOT EDIT MANUALLY — regenerate via extract-components-css.mjs
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Button ────────────────────────────────────────────────── */
+/* @anatomy
+   <div class="row"><span class="label">Primary 56</span><button class="btn btn-primary btn-lg">Buy now</button><button class="btn btn-primary btn-lg" disabled>Buy now</button></div>
+   <hr class="divider">
+   <div class="row"><span class="label">Secondary 48</span><button class="btn btn-secondary">Shop the latest</button><button class="btn btn-secondary" disabled>Shop the latest</button></div>
+   <div class="row"><span class="label">Text 48</span><button class="btn btn-text">Learn more ›</button><button class="btn btn-text" disabled>Learn more ›</button></div>
+*/
+body{margin:0;padding:12px;background:var(--background);color:var(--foreground);font-family:var(--font-sans);letter-spacing:var(--tracking-normal)}.row{display:flex;align-items:center;gap:calc(var(--spacing)*3);flex-wrap:wrap;margin:0 0 calc(var(--spacing)*3)}.label{min-width:72px;color:var(--muted-foreground);font:600 10px/1 var(--font-mono);letter-spacing:.12em;text-transform:uppercase}.btn{display:inline-flex;align-items:center;justify-content:center;gap:calc(var(--spacing)*1.5);height:40px;padding:0 20px;border:none;border-radius:calc(var(--radius)*2);background:transparent;color:var(--foreground);font:600 14px/1 var(--font-sans);letter-spacing:var(--tracking-normal);white-space:nowrap;box-shadow:var(--shadow-sm);cursor:pointer;transition:background-color .18s ease,color .18s ease,opacity .18s ease,filter .18s ease}.btn:focus-visible{outline:2px solid var(--ring);outline-offset:2px}.btn:disabled{opacity:.42;cursor:not-allowed}.btn-primary{background:var(--primary);color:var(--primary-foreground)}.btn-primary:hover{filter:brightness(.96)}.btn-secondary{height:48px;padding:0 24px;background:var(--secondary);color:var(--secondary-foreground)}.btn-secondary:hover{background:var(--muted)}.btn-text{height:48px;padding:0 4px;box-shadow:none}.btn-text:hover{color:var(--primary)}.btn-lg{height:56px;padding:0 28px;font-size:16px}.divider{border:0;border-top:1px solid var(--border);margin:calc(var(--spacing)*4) 0}
+
+/* ── Card ──────────────────────────────────────────────────── */
+/* @anatomy
+   <div class="row">
+   <span class="label">Info</span>
+   <article class="card">
+   <div><div class="eyebrow">Pinguo Apple</div><h1 class="title">Built for creators</h1><p class="body-copy">A calm surface for comparing cameras, storage tiers, and bundle benefits across the ecosystem.</p></div>
+   <a class="cta" href="#">Compare models</a>
+   </article>
+   <article class="card disabled" aria-disabled="true">
+   <div><div class="eyebrow">Campus Store</div><h1 class="title">Education pricing</h1><p class="body-copy">Student bundles stay visible while unavailable purchase actions remain clearly disabled.</p></div>
+   <span class="cta">Compare models</span>
+   </article>
+   </div>
+   <hr class="divider">
+   <div class="row">
+   <span class="label">Media</span>
+   <article class="card media-card">
+   <div class="media"></div>
+   <div><div class="meta">Creator bundle</div><h1 class="title">Studio kit with Lens Sync</h1><div class="price">From $799 with Education pricing</div></div>
+   </article>
+   <article class="card media-card dark">
+   <div class="media"></div>
+   <div><div class="meta">Consumer imaging ecosystem</div><h1 class="title">Built for creators</h1><div class="price">Compare models across camera, app, and cloud plans</div></div>
+   </article>
+   </div>
+*/
+body{margin:0;padding:12px;background:var(--background);color:var(--foreground);font:500 14px/1.45 var(--font-sans);letter-spacing:var(--tracking-normal)}.row{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}.label{width:72px;padding-top:10px;color:var(--muted-foreground);font:700 10px/1 var(--font-sans);letter-spacing:.12em;text-transform:uppercase}.divider{margin:12px 0;border:0;border-top:1px solid var(--border)}.card{width:188px;min-height:148px;padding:calc(var(--spacing)*5);display:flex;flex-direction:column;justify-content:space-between;background:var(--card);color:var(--card-foreground);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-md);transition:transform .18s ease,box-shadow .18s ease}.card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}.card.disabled,.card.disabled:hover{opacity:.5;transform:none;box-shadow:var(--shadow-md)}.eyebrow,.meta{color:var(--muted-foreground);font-size:11px;letter-spacing:.08em;text-transform:uppercase}.title{margin:6px 0 8px;font-size:18px;line-height:1.15}.body-copy{margin:0;color:var(--muted-foreground);font-size:13px}.cta{display:inline-flex;align-items:center;justify-content:center;width:max-content;margin-top:12px;padding:calc(var(--spacing)*2) calc(var(--spacing)*3.5);border-radius:999px;background:var(--primary);color:var(--primary-foreground);font-size:12px;font-weight:700;text-decoration:none}.media{aspect-ratio:4/3;border-radius:calc(var(--radius) - 4px);background:linear-gradient(135deg,var(--secondary),var(--accent));border:1px solid var(--border)}.media-card{min-height:212px;padding:calc(var(--spacing)*4)}.media-card .title{font-size:16px;margin:10px 0 6px}.price{font-size:12px;color:var(--muted-foreground)}.dark{background:var(--card);color:var(--card-foreground)}
+
+/* ── Comparison Table ──────────────────────────────────────── */
+/* @anatomy
+   <div class="row"><span class="label">Default</span><div class="t"><div class="c m">Compare models</div><div class="c h"><span class="k">Mini</span><span class="s">Pinguo Apple</span></div><div class="c h"><span class="k">Air</span><span class="s">Popular</span></div><div class="c h b"><span class="k">Pro</span><span class="s">Creator</span></div><div class="c m">Battery life</div><div class="c v">12h</div><div class="c v">16h</div><div class="c v">20h</div><div class="c m">Storage</div><div class="c v">256GB</div><div class="c v">512GB</div><div class="c v">1TB</div><div class="c m">Camera system</div><div class="c n">Dual</div><div class="c n">48MP</div><div class="c n">48MP+T</div></div><div class="t x" aria-disabled="true"><div class="c m">Compare models</div><div class="c h"><span class="k">Mini</span><span class="s">Pinguo Apple</span></div><div class="c h"><span class="k">Air</span><span class="s">Popular</span></div><div class="c h b"><span class="k">Pro</span><span class="s">Creator</span></div><div class="c m">Battery life</div><div class="c v">12h</div><div class="c v">16h</div><div class="c v">20h</div><div class="c m">Storage</div><div class="c v">256GB</div><div class="c v">512GB</div><div class="c v">1TB</div><div class="c m">Camera system</div><div class="c n">Dual</div><div class="c n">48MP</div><div class="c n">48MP+T</div></div></div>
+   <hr class="divider">
+   <div class="row"><span class="label">Compact</span><div class="t q dark"><div class="c m">Compare models</div><div class="c h"><span class="k">Mini</span></div><div class="c h"><span class="k">Air</span></div><div class="c h b"><span class="k">Pro</span></div><div class="c h"><span class="k">Ultra</span></div><div class="c m">Battery life</div><div class="c v">12h</div><div class="c v">16h</div><div class="c v">20h</div><div class="c v">24h</div><div class="c m">Storage</div><div class="c v">256GB</div><div class="c v">512GB</div><div class="c v">1TB</div><div class="c v">2TB</div><div class="c m">Camera system</div><div class="c n">Dual</div><div class="c n">48MP</div><div class="c n">48MP+T</div><div class="c n">Triple</div></div></div>
+*/
+body{margin:0;padding:12px;background:var(--background);color:var(--foreground);font:500 13px/1.4 var(--font-sans);letter-spacing:var(--tracking-normal)}.row{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:8px}.label{width:72px;padding-top:10px;color:var(--muted-foreground);font:700 10px/1 var(--font-mono);letter-spacing:.12em;text-transform:uppercase}.divider{margin:12px 0;border:0;border-top:1px solid var(--border)}.t{display:grid;grid-template-columns:96px repeat(3,1fr);overflow:hidden;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);color:var(--card-foreground);box-shadow:var(--shadow-sm)}.q{grid-template-columns:82px repeat(4,1fr)}.c{padding:10px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)}.t>.c:nth-child(4n),.q>.c:nth-child(5n){border-right:0}.t>.c:nth-last-child(-n+4),.q>.c:nth-last-child(-n+5){border-bottom:0}.m{background:var(--background);color:var(--muted-foreground);font:700 10px/1 var(--font-mono);letter-spacing:.12em;text-transform:uppercase}.h{background:var(--background);font-weight:700}.k{display:block;font-size:14px;line-height:1.1}.s{display:block;margin-top:4px;color:var(--chart-2);font-size:11px;font-weight:700}.b .k{color:var(--chart-2)}.v{font-weight:600}.n{color:var(--muted-foreground);font-size:12px}.x{opacity:.45}
+
+/* ── Input ─────────────────────────────────────────────────── */
+/* @anatomy
+   <div class="row">
+   <span class="label">Search 44</span>
+   <div class="field">
+   <span class="icon">⌕</span>
+   <input class="control" aria-label="Search products" placeholder="Search products">
+   <button class="clear" type="button" aria-label="Clear search">×</button>
+   </div>
+   <div class="field disabled">
+   <span class="icon">⌕</span>
+   <input class="control" aria-label="Search products disabled" placeholder="Search products" disabled>
+   <button class="clear" type="button" aria-label="Clear search disabled" disabled>×</button>
+   </div>
+   </div>
+   <hr class="divider">
+   <div class="row">
+   <span class="label">Dark 40</span>
+   <div class="surface dark">
+   <div class="field small">
+   <input class="control" aria-label="Email address" placeholder="Email address">
+   </div>
+   </div>
+   <div class="surface dark">
+   <div class="field small disabled">
+   <input class="control" aria-label="Track your order disabled" placeholder="Track your order" disabled>
+   </div>
+   </div>
+   </div>
+*/
+body{margin:0;padding:12px;background:var(--background);color:var(--foreground);font:500 13px/1.4 var(--font-sans)}.row{display:flex;align-items:center;gap:calc(var(--spacing)*3);flex-wrap:wrap;margin-bottom:8px}.label{min-width:58px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-foreground)}.divider{border:0;border-top:1px solid var(--border);margin:10px 0}.surface{display:flex;gap:calc(var(--spacing)*2);padding:calc(var(--spacing)*3);border:1px solid var(--border);border-radius:var(--radius);background:var(--card);box-shadow:var(--shadow-sm)}.dark{background:var(--background);color:var(--foreground)}.field{display:flex;align-items:center;gap:calc(var(--spacing)*2);min-width:240px;height:44px;padding:0 calc(var(--spacing)*3);border:1px solid var(--input);border-radius:var(--radius);background:var(--background);color:var(--foreground);box-shadow:var(--shadow-xs)}.field.small{height:40px}.field:focus-within{border-color:var(--ring);box-shadow:0 0 0 1px var(--ring)}.field.disabled{opacity:.55}.icon,.clear{padding:0;border:0;background:transparent;color:var(--icon-muted);font:inherit}.icon{font-size:13px}.control{flex:1;border:0;outline:0;background:transparent;color:inherit;font:inherit}.control::placeholder{color:var(--muted-foreground)}
+
+/* ── Navigation ────────────────────────────────────────────── */
+/* @anatomy
+   <div class="row"><span class="label">Global 44</span><nav class="webbar dark" aria-label="Pinguo Apple global navigation"><span class="brand">Pinguo Apple</span><div class="rail"><a class="link" href="#">Store</a><a class="link" href="#">Explore</a><a class="link" href="#">Community</a><a class="link" href="#">Support</a></div></nav><nav class="webbar dark disabled" aria-label="Pinguo Apple global navigation disabled"><span class="brand">Pinguo Apple</span><div class="rail"><span class="link">Store</span><span class="link">Explore</span><span class="link">Community</span><span class="link">Support</span></div></nav></div>
+   <hr class="divider">
+   <div class="row"><span class="label">Tab Bar</span><div class="mobile"><div class="screen"><nav class="tabbar" aria-label="Pinguo Apple tab bar"><a class="tab" href="#"><span class="dot"></span><span>Store</span></a><a class="tab" href="#"><span class="dot"></span><span>Explore</span></a><a class="tab" href="#"><span class="dot"></span><span>Community</span></a><a class="tab" href="#"><span class="dot"></span><span>Support</span></a></nav></div></div><div class="mobile disabled"><div class="screen"><nav class="tabbar" aria-label="Pinguo Apple tab bar disabled"><span class="tab"><span class="dot"></span><span>Store</span></span><span class="tab"><span class="dot"></span><span>Explore</span></span><span class="tab"><span class="dot"></span><span>Community</span></span><span class="tab"><span class="dot"></span><span>Support</span></span></nav></div></div></div>
+*/
+body{margin:0;padding:12px;background:var(--background);color:var(--foreground);font:500 13px/1.4 var(--font-sans);letter-spacing:var(--tracking-normal)}.row{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:8px}.label{width:72px;padding-top:10px;color:var(--muted-foreground);font:700 10px/1 var(--font-mono);letter-spacing:.12em;text-transform:uppercase}.divider{margin:12px 0;border:0;border-top:1px solid var(--border)}.webbar,.mobile{border:1px solid var(--border);box-shadow:var(--shadow-sm)}.webbar{display:flex;align-items:center;gap:calc(var(--spacing)*2);min-width:320px;height:44px;padding:0 calc(var(--spacing)*3);border-radius:var(--radius);background:var(--sidebar)}.brand{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}.rail{display:flex;gap:calc(var(--spacing)*1.5);margin-left:auto}.link,.tab{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;color:inherit;text-decoration:none;white-space:nowrap;transition:background-color .18s ease,color .18s ease,opacity .18s ease}.link{height:32px;padding:0 calc(var(--spacing)*2.5)}.link:hover,.tab:hover{background:var(--secondary)}.link:focus-visible,.tab:focus-visible{outline:2px solid var(--ring);outline-offset:2px}.dark{background:var(--sidebar);color:var(--foreground)}.disabled{opacity:.48}.disabled .link,.disabled .tab{pointer-events:none}.mobile{padding:calc(var(--spacing)*2);border-radius:calc(var(--radius)*1.1);background:var(--card)}.screen{display:flex;align-items:flex-end;justify-content:center;width:188px;height:164px;padding:calc(var(--spacing)*3);border-radius:calc(var(--radius)*.9);background:linear-gradient(180deg,var(--background),var(--secondary))}.tabbar{display:flex;gap:calc(var(--spacing)*1.5);padding:calc(var(--spacing)*1.5);border:1px solid var(--border);border-radius:999px;background:var(--card);box-shadow:var(--shadow-md)}.tab{flex-direction:column;gap:2px;min-width:56px;height:56px;padding:0 calc(var(--spacing)*1.5);font-size:11px;text-align:center}.dot{width:18px;height:18px;border-radius:999px;background:var(--secondary);box-shadow:inset 0 0 0 1px var(--border)}.tab:hover .dot{background:var(--primary)}
+
+/* ── Product Grid ──────────────────────────────────────────── */
+/* @anatomy
+   <div class="row">
+   <span class="label">4-up</span>
+   <div class="grid grid-4">
+   <article class="card"><div class="media"></div><span class="eyebrow">New this season</span><strong class="title">Pinguo Lens Pro</strong><span class="price">From $999</span><a class="cta" href="/">Compare all models</a></article>
+   <article class="card"><div class="media"></div><span class="eyebrow">Creator kit</span><strong class="title">Pinguo Air Cam</strong><span class="price">From $749</span><a class="cta" href="/">Build your setup</a></article>
+   <article class="card"><div class="media"></div><span class="eyebrow">Studio ready</span><strong class="title">Pinguo Dock One</strong><span class="price">From $299</span><a class="cta" href="/">See accessories</a></article>
+   <article class="card is-disabled"><div class="media"></div><span class="eyebrow">Coming soon</span><strong class="title">Pinguo Vision Mini</strong><span class="price muted">Notify me</span><span class="cta">Unavailable</span></article>
+   </div>
+   </div>
+   <hr class="divider">
+   <div class="row">
+   <span class="label">Story</span>
+   <div class="grid grid-2">
+   <article class="card story"><div class="media"></div><span class="eyebrow">Consumer imaging product ecosystem</span><strong class="title">Travel light with one camera, one dock, and one cloud-ready edit flow.</strong><span class="price muted">Pinguo Apple picks for weekend shoots</span><a class="cta" href="/">Shop the story</a></article>
+   <article class="card story"><div class="media"></div><span class="eyebrow">Compare lineup</span><strong class="title">Choose between compact capture, pro optics, and desktop-grade finishing tools.</strong><span class="price muted">Made for photo-first households</span><a class="cta" href="/">Compare all models</a></article>
+   </div>
+   </div>
+*/
+body{margin:0;padding:12px;background:var(--background);color:var(--foreground);font:500 14px/1.4 var(--font-sans)}.row{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px}.label{width:72px;padding-top:6px;color:var(--muted-foreground);font-size:10px;letter-spacing:.12em;text-transform:uppercase;flex:0 0 auto}.grid{display:grid;gap:8px;flex:1}.grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}.card{display:flex;flex-direction:column;gap:8px;padding:10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);color:var(--card-foreground);box-shadow:var(--shadow-xs);transition:border-color .2s ease,transform .2s ease}.card:hover{border-color:var(--primary);transform:translateY(-1px)}.media{aspect-ratio:1;border-radius:calc(var(--radius) - 4px);background:linear-gradient(135deg,var(--secondary),var(--background));border:1px solid var(--border)}.story .media{aspect-ratio:1.25;background:linear-gradient(135deg,var(--foreground),var(--secondary))}.eyebrow{color:var(--muted-foreground);font-size:10px;letter-spacing:.08em;text-transform:uppercase}.title{font-size:15px;line-height:1.25}.price{font-variant-numeric:tabular-nums}.cta{display:inline-flex;align-self:flex-start;padding:7px 10px;border-radius:999px;background:var(--primary);color:var(--primary-foreground);font-size:12px;text-decoration:none}.muted{color:var(--muted-foreground)}.is-disabled{opacity:.55}.divider{margin:10px 0;border:0;border-top:1px solid var(--border)}
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--apple-background);
+    --color-foreground: var(--apple-foreground);
+    --color-card: var(--apple-card);
+    --color-card-foreground: var(--apple-card-foreground);
+    --color-popover: var(--apple-popover);
+    --color-popover-foreground: var(--apple-popover-foreground);
+    --color-primary: var(--apple-primary);
+    --color-primary-foreground: var(--apple-primary-foreground);
+    --color-secondary: var(--apple-secondary);
+    --color-secondary-foreground: var(--apple-secondary-foreground);
+    --color-muted: var(--apple-muted);
+    --color-muted-foreground: var(--apple-muted-foreground);
+    --color-accent: var(--apple-accent);
+    --color-accent-foreground: var(--apple-accent-foreground);
+    --color-destructive: var(--apple-destructive);
+    --color-destructive-foreground: var(--apple-destructive-foreground);
+    --color-border: var(--apple-border);
+    --color-input: var(--apple-input);
+    --color-ring: var(--apple-ring);
+    --color-chart-1: var(--apple-chart-1);
+    --color-chart-2: var(--apple-chart-2);
+    --color-chart-3: var(--apple-chart-3);
+    --color-chart-4: var(--apple-chart-4);
+    --color-chart-5: var(--apple-chart-5);
+    --color-sidebar: var(--apple-sidebar);
+    --color-sidebar-foreground: var(--apple-sidebar-foreground);
+    --color-sidebar-primary: var(--apple-sidebar-primary);
+    --color-sidebar-primary-foreground: var(--apple-sidebar-primary-foreground);
+    --color-sidebar-accent: var(--apple-sidebar-accent);
+    --color-sidebar-accent-foreground: var(--apple-sidebar-accent-foreground);
+  }
+  @layer base {
+    body { background: var(--apple-background); color: var(--apple-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body style="background: var(--apple-background-50, #ffffff); color: var(--apple-foreground); font-family: var(--font-sans), 'DM Sans', system-ui, sans-serif; margin: 0; -webkit-font-smoothing: antialiased;">
+
+  <!-- ═══ Project Shell: Sticky Nav ═══ -->
+  <!-- partials/project-shell.html — active slot: 错题本 -->
+  <style>
+    /* ── Nav Shell (scoped to #app-shell) ── */
+    #app-shell {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(245, 245, 247, 0.72);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 0.5px solid var(--apple-border, rgba(0, 0, 0, 0.08));
+    }
+
+    #app-shell-inner {
+      width: 100%;
+      max-width: 1024px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      height: 100%;
+    }
+
+    .app-brand {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      text-decoration: none;
+      color: var(--apple-foreground);
+      font-family: var(--font-sans), "DM Sans", system-ui, sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+    }
+
+    .app-brand svg {
+      width: 22px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+
+    .app-nav-links {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .app-nav-links a {
+      font-family: var(--font-sans), "DM Sans", system-ui, sans-serif;
+      font-size: 12px;
+      font-weight: 400;
+      line-height: 1;
+      color: var(--apple-text-500, rgba(0, 0, 0, 0.56));
+      text-decoration: none;
+      white-space: nowrap;
+      transition: color 0.2s ease;
+      padding: 4px 0;
+    }
+
+    .app-nav-links a:hover {
+      color: var(--apple-foreground);
+    }
+
+    .app-nav-links a[data-active="true"] {
+      color: var(--apple-foreground);
+      font-weight: 500;
+    }
+
+    .app-nav-utility {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .app-nav-utility button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      border: none;
+      border-radius: 50%;
+      background: transparent;
+      color: var(--apple-text-500, rgba(0, 0, 0, 0.56));
+      cursor: pointer;
+      transition: color 0.2s ease, background 0.2s ease;
+    }
+
+    .app-nav-utility button:hover {
+      color: var(--apple-foreground);
+      background: var(--apple-muted, rgba(0, 0, 0, 0.04));
+    }
+
+    .app-nav-utility button svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .user-avatar {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--apple-brand-600, #0066cc);
+      color: #fff;
+      font-family: var(--font-sans), "DM Sans", system-ui, sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: box-shadow 0.2s ease;
+    }
+
+    .user-avatar:hover {
+      box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.2);
+    }
+  </style>
+
+  <nav id="app-shell" role="navigation" aria-label="Main navigation">
+    <div id="app-shell-inner">
+
+      <!-- Brand -->
+      <a href="./index.html" class="app-brand" aria-label="粉笔助手">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
+          <path d="M8 7h6"/>
+          <path d="M8 11h4"/>
+        </svg>
+        <span>粉笔助手</span>
+      </a>
+
+      <!-- Nav Links — SLOT: 错题本 active -->
+      <ul class="app-nav-links">
+        <li><a href="./history.html" data-dom-id="nav-home">练习历史</a></li>
+        <li><a href="./wrong-questions.html" data-active="true" data-dom-id="nav-wrong">错题本</a></li>
+        <li><a href="./search.html" data-dom-id="nav-search">搜索</a></li>
+      </ul>
+
+      <!-- Utility -->
+      <div class="app-nav-utility">
+        <button aria-label="通知" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+          </svg>
+        </button>
+        <div class="user-avatar" aria-label="用户菜单" role="button" tabindex="0">U</div>
+      </div>
+
+    </div>
+  </nav>
+
+  <!-- ═══ Page Content ═══ -->
+  <main style="max-width: 1024px; margin: 0 auto; padding: 0 20px;">
+
+    <!-- Page Header -->
+    <section style="padding: 32px 0 24px;">
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+        <div>
+          <h1 style="margin: 0; font-size: 28px; font-weight: 600; line-height: 1.14; letter-spacing: -0.02em; color: var(--apple-foreground); text-wrap: balance; word-break: keep-all; overflow-wrap: break-word;">错题本</h1>
+          <p style="margin: 8px 0 0; font-size: 14px; line-height: 1.5; color: var(--apple-text-500);">
+            按知识点分类整理，高效复习易错题目
+          </p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 24px; flex-shrink: 0;">
+          <div style="text-align: center;">
+            <div style="font-family: var(--font-mono), 'JetBrains Mono', monospace; font-size: 28px; font-weight: 600; line-height: 1; color: var(--apple-foreground); font-variant-numeric: tabular-nums;">23</div>
+            <div style="font-size: 12px; color: var(--apple-text-500); margin-top: 4px;">总错题</div>
+          </div>
+          <div style="width: 1px; height: 36px; background: var(--apple-border);"></div>
+          <div style="text-align: center;">
+            <div style="font-family: var(--font-mono), 'JetBrains Mono', monospace; font-size: 28px; font-weight: 600; line-height: 1; color: var(--apple-foreground); font-variant-numeric: tabular-nums;">8</div>
+            <div style="font-size: 12px; color: var(--apple-text-500); margin-top: 4px;">已复习</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Toolbar -->
+    <div style="display: flex; align-items: center; gap: 8px; padding-bottom: 16px;">
+      <button class="btn btn-secondary" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--apple-border); background: transparent; color: var(--apple-foreground); font-family: var(--font-sans), 'DM Sans', system-ui, sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: background-color 0.18s ease, color 0.18s ease;">
+        <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i>
+        同步错题
+      </button>
+      <button class="btn btn-secondary" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--apple-border); background: transparent; color: var(--apple-foreground); font-family: var(--font-sans), 'DM Sans', system-ui, sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: background-color 0.18s ease, color 0.18s ease;">
+        <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+        导出PDF
+      </button>
+    </div>
+
+    <!-- Content Grid: Sidebar + Main -->
+    <div style="display: flex; gap: 24px; padding-bottom: 48px; min-height: 480px;">
+
+      <!-- Left Sidebar: Knowledge Categories -->
+      <aside style="width: 200px; flex-shrink: 0; display: flex; flex-direction: column; gap: 2px;" role="navigation" aria-label="知识点分类">
+        <button class="sidebar-item active" data-category="verbal" style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 12px; border: none; border-radius: 8px; background: var(--apple-brand-600, #0066cc); color: #fff; font-family: var(--font-sans), 'DM Sans', system-ui, sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; transition: background-color 0.18s ease; text-align: left;">
+          <span style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+            <i data-lucide="book-open" style="width: 16px; height: 16px; flex-shrink: 0;"></i>
+            <span class="truncate">言语理解</span>
+          </span>
+          <span style="flex-shrink: 0; min-width: 22px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: rgba(255,255,255,0.2); font-family: var(--font-mono), 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;">8</span>
+        </button>
+        <button class="sidebar-item" data-category="logic" style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 12px; border: none; border-radius: 8px; background: transparent; color: var(--apple-foreground); font-family: var(--font-sans), 'DM Sans', system-ui, sans-serif; font-size: 13px; font-weight: 400; cursor: pointer; transition: background-color 0.18s ease; text-align: left;">
+          <span style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+            <i data-lucide="git-branch" style="width: 16px; height: 16px; flex-shrink: 0;"></i>
+            <span class="truncate">判断推理</span>
+          </span>
+          <span style="flex-shrink: 0; min-width: 22px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: var(--apple-muted, rgba(0,0,0,0.04)); font-family: var(--font-mono), 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;">6</span>
+        </button>
+        <button class="sidebar-item" data-category="math" style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 12px; border: none; border-radius: 8px; background: transparent; color: var(--apple-foreground); font-family: var(--font-sans), 'DM Sans', system-ui, sans-serif; font-size: 13px; font-weight: 400; cursor: pointer; transition: background-color 0.18s ease; text-align: left;">
+          <span style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+            <i data-lucide="calculator" style="width: 16px; height: 16px; flex-shrink: 0;"></i>
+            <span class="truncate">数量关系</span>
+          </span>
+          <span style="flex-shrink: 0; min-width: 22px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: var(--apple-muted, rgba(0,0,0,0.04)); font-family: var(--font-mono), 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;">5</span>
+        </button>
+        <button class="sidebar-item" data-category="data" style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 12px; border: none; border-radius: 8px; background: transparent; color: var(--apple-foreground); font-family: var(--font-sans), 'DM Sans', system-ui, sans-serif; font-size: 13px; font-weight: 400; cursor: pointer; transition: background-color 0.18s ease; text-align: left;">
+          <span style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+            <i data-lucide="bar-chart-3" style="width: 16px; height: 16px; flex-shrink: 0;"></i>
+            <span class="truncate">资料分析</span>
+          </span>
+          <span style="flex-shrink: 0; min-width: 22px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: var(--apple-muted, rgba(0,0,0,0.04)); font-family: var(--font-mono), 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;">4</span>
+        </button>
+      </aside>
+
+      <!-- Main Content: Wrong Questions List -->
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px;">
+
+        <!-- Question Card 1 -->
+        <a href="./question.html" data-dom-id="cta-wrong-detail" class="question-card" style="display: block; padding: 16px 20px; border: 1px solid var(--apple-border); border-radius: var(--radius, 1.2rem); background: var(--apple-card, var(--background-50)); text-decoration: none; color: var(--apple-foreground); transition: transform 0.18s ease, box-shadow 0.18s ease; cursor: pointer;">
+          <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <span style="flex-shrink: 0; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--apple-brand-600, #0066cc); color: #fff; font-family: var(--font-mono), 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600;">1</span>
+            <div style="flex: 1; min-width: 0;">
+              <p style="margin: 0; font-size: 14px; line-height: 1.5; color: var(--apple-foreground); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">下列各句中，表达最得体的一句是...</p>
+              <div style="display: flex; align-items: center; gap: 16px; margin-top: 10px; flex-wrap: wrap;">
+                <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; white-space: nowrap;">
+                  <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--state-success, #34c759);"></span>
+                  <span style="color: var(--apple-text-500);">正确:</span>
+                  <span style="color: var(--state-success, #34c759); font-family: var(--font-mono), 'JetBrains Mono', monospace; font-weight: 600;">C</span>
+                </span>
+                <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; white-space: nowrap;">
+                  <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--state-error, #ff3b30);"></span>
+                  <span style="color: var(--apple-text-500);">你的答案:</span>
+                  <span style="color: var(--state-error, #ff3b30); font-family: var(--font-mono), 'JetBrains Mono', monospace; font-weight: 600;">A</span>
+                </span>
+                <span style="margin-left: auto; font-size: 12px; color: var(--apple-text-500); font-family: var(--font-mono), 'JetBrains Mono', monospace; white-space: nowrap; flex-shrink: 0;">2024-01-15</span>
+              </div>
+            </div>
+          </div>
+        </a>
+
+        <!-- Question Card 2 -->
+        <a href="./question.html" data-dom-id="cta-wrong-detail" class="question-card" style="display: block; padding: 16px 20px; border: 1px solid var(--apple-border); border-radius: var(--radius, 1.2rem); background: var(--apple-card, var(--background-50)); text-decoration: none; color: var(--apple-foreground); transition: transform 0.18s ease, box-shadow 0.18s ease; cursor: pointer;">
+          <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <span style="flex-shrink: 0; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--apple-brand-600, #0066cc); color: #fff; font-family: var(--font-mono), 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600;">2</span>
+            <div style="flex: 1; min-width: 0;">
+              <p style="margin: 0; font-size: 14px; line-height: 1.5; color: var(--apple-foreground); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">依次填入下面一段文字横线处的语句...</p>
+              <div style="display: flex; align-items: center; gap: 16px; margin-top: 10px; flex-wrap: wrap;">
+                <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; white-space: nowrap;">
+                  <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--state-success, #34c759);"></span>
+                  <span style="color: var(--apple-text-500);">正确:</span>
+                  <span style="color: var(--state-success, #34c759); font-family: var(--font-mono), 'JetBrains Mono', monospace; font-weight: 600;">B</span>
+                </span>
+                <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; white-space: nowrap;">
+                  <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--state-error, #ff3b30);"></span>
+                  <span style="color: var(--apple-text-500);">你的答案:</span>
+                  <span style="color: var(--state-error, #ff3b30); font-family: var(--font-mono), 'JetBrains Mono', monospace; font-weight: 600;">D</span>
+                </span>
+                <span style="margin-left: auto; font-size: 12px; color: var(--apple-text-500); font-family: var(--font-mono), 'JetBrains Mono', monospace; white-space: nowrap; flex-shrink: 0;">2024-01-12</span>
+              </div>
+            </div>
+          </div>
+        </a>
+
+        <!-- Question Card 3 -->
+        <a href="./question.html" data-dom-id="cta-wrong-detail" class="question-card" style="display: block; padding: 16px 20px; border: 1px solid var(--apple-border); border-radius: var(--radius, 1.2rem); background: var(--apple-card, var(--background-50)); text-decoration: none; color: var(--apple-foreground); transition: transform 0.18s ease, box-shadow 0.18s ease; cursor: pointer;">
+          <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <span style="flex-shrink: 0; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--apple-brand-600, #0066cc); color: #fff; font-family: var(--font-mono), 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600;">3</span>
+            <div style="flex: 1; min-width: 0;">
+              <p style="margin: 0; font-size: 14px; line-height: 1.5; color: var(--apple-foreground); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">下列句子中，没有语病的一项是...</p>
+              <div style="display: flex; align-items: center; gap: 16px; margin-top: 10px; flex-wrap: wrap;">
+                <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; white-space: nowrap;">
+                  <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--state-success, #34c759);"></span>
+                  <span style="color: var(--apple-text-500);">正确:</span>
+                  <span style="color: var(--state-success, #34c759); font-family: var(--font-mono), 'JetBrains Mono', monospace; font-weight: 600;">A</span>
+                </span>
+                <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; white-space: nowrap;">
+                  <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--state-error, #ff3b30);"></span>
+                  <span style="color: var(--apple-text-500);">你的答案:</span>
+                  <span style="color: var(--state-error, #ff3b30); font-family: var(--font-mono), 'JetBrains Mono', monospace; font-weight: 600;">C</span>
+                </span>
+                <span style="margin-left: auto; font-size: 12px; color: var(--apple-text-500); font-family: var(--font-mono), 'JetBrains Mono', monospace; white-space: nowrap; flex-shrink: 0;">2024-01-08</span>
+              </div>
+            </div>
+          </div>
+        </a>
+
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>

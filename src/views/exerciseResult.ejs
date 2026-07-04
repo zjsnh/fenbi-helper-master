@@ -1,0 +1,1097 @@
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>练习报告 · <%= cleanTitle(exercise.sheet.name) %></title>
+  <link rel="stylesheet" href="/theme.css">
+  <link rel="stylesheet" href="/easymde.min.css">
+  <link rel="stylesheet" href="/custom-input.css">
+  <script src="/echarts.min.js"></script>
+  <script src="/easymde.min.js"></script>
+  <style>
+    body { background: var(--paper); }
+
+    /* ─ 报告头部 ── */
+    .report-header-card {
+      background: linear-gradient(135deg, #f5f9ff 0%, #eaf1fb 50%, #e0e9f7 100%);
+      border-radius: 16px;
+      padding: 28px 32px;
+      margin-bottom: 24px;
+      border: 0.5px solid #d0dff0;
+      position: relative;
+      overflow: hidden;
+    }
+    .report-header-card::before {
+      content: '';
+      position: absolute;
+      top: -40px; right: -40px;
+      width: 160px; height: 160px;
+      background: radial-gradient(circle, rgba(0,102,204,0.06) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+    .report-header-card::after {
+      content: '';
+      position: absolute;
+      bottom: -30px; left: 30%;
+      width: 120px; height: 120px;
+      background: radial-gradient(circle, rgba(90,155,230,0.04) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+    .report-title-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      position: relative;
+      z-index: 1;
+    }
+    .report-title-row h2 {
+      font-size: 22px;
+      font-weight: 800;
+      color: #0a1628;
+      margin: 0;
+      font-family: var(--font-display);
+      letter-spacing: -0.3px;
+    }
+    .report-meta {
+      display: flex;
+      gap: 16px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+    .report-meta span {
+      font-size: 13px;
+      color: #4a6d9a;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .report-meta b {
+      color: #1a4a7a;
+      font-weight: 700;
+    }
+    .report-actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    .report-actions a {
+      padding: 7px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 8px;
+      text-decoration: none;
+      transition: all 0.25s;
+      white-space: nowrap;
+    }
+    .btn-outline {
+      background: #fff;
+      color: var(--brand-600);
+      border: 1.5px solid var(--brand-200);
+    }
+    .btn-outline:hover {
+      background: var(--brand-600);
+      color: #fff;
+      border-color: var(--brand-600);
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #0066cc, #0052a3);
+      color: #fff;
+      border: none;
+      box-shadow: 0 2px 8px rgba(0,102,204,0.25);
+    }
+    .btn-primary:hover {
+      transform: none;
+      box-shadow: 0 4px 12px rgba(0,102,204,0.35);
+    }
+
+    /* ─ 来源标签 ── */
+    .source-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+      position: relative;
+      z-index: 1;
+    }
+    .source-tag {
+      font-size: 12px;
+      padding: 4px 14px;
+      border-radius: 20px;
+      background: rgba(255,255,255,0.7);
+      color: var(--text-600);
+      border: 0.5px solid var(--text-100);
+      font-weight: 500;
+    }
+
+    /* ── 统计卡片行 ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .stat-card-new {
+      background: var(--card);
+      border: 0.5px solid var(--border-light);
+      border-radius: 12px;
+      padding: 18px 20px;
+      text-align: center;
+      transition: all 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card-new::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 3px;
+    }
+    .stat-card-new.red::after { background: linear-gradient(90deg, #e74c3c, #c0392b); }
+    .stat-card-new.amber::after { background: linear-gradient(90deg, #f39c12, #e67e22); }
+    .stat-card-new.green::after { background: linear-gradient(90deg, #27ae60, #2ecc71); }
+    .stat-card-new.gray::after { background: linear-gradient(90deg, #95a5a6, #7f8c8d); }
+    .stat-card-new:hover {
+      transform: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    }
+    .stat-card-new .stat-val {
+      font-size: 28px;
+      font-weight: 800;
+      font-family: var(--font-display);
+      letter-spacing: -1px;
+      line-height: 1;
+    }
+    .stat-card-new.red .stat-val { color: #e74c3c; }
+    .stat-card-new.amber .stat-val { color: #f39c12; }
+    .stat-card-new.green .stat-val { color: #27ae60; }
+    .stat-card-new.gray .stat-val { color: #7f8c8d; font-size: 14px; font-weight: 600; }
+    .stat-card-new .stat-lbl {
+      font-size: 12px;
+      color: var(--text-ter);
+      margin-top: 6px;
+    }
+
+    /* ── 图表 ── */
+    .chart-box {
+      background: var(--card);
+      border: 0.5px solid var(--border-light);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 28px;
+    }
+    #costChart { width: 100%; height: 280px; }
+
+    /* ── 逻辑填空统计模块 ── */
+    .logic-fill-section {
+      background: var(--card);
+      border: 0.5px solid var(--border-light);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 28px;
+    }
+    .logic-fill-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-900);
+      font-family: var(--font-display);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .logic-fill-title::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 16px;
+      background: var(--brand-600);
+      border-radius: 2px;
+    }
+    .logic-fill-subtitle {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-sec);
+      margin: 14px 0 10px;
+    }
+    .logic-fill-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+    .logic-fill-table th {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-ter);
+      text-align: center;
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border-light);
+    }
+    .logic-fill-table td {
+      font-size: 13px;
+      text-align: center;
+      padding: 8px;
+      border-bottom: 1px solid var(--text-50);
+    }
+    .logic-fill-table tr:last-child td { border-bottom: none; }
+    .logic-fill-table .opt-label {
+      font-weight: 700;
+      font-family: var(--font-display);
+      font-size: 14px;
+    }
+    .logic-fill-table .opt-label-A { color: #27ae60; }
+    .logic-fill-table .opt-label-B { color: #2196f3; }
+    .logic-fill-table .opt-label-C { color: #f39c12; }
+    .logic-fill-table .opt-label-D { color: #e74c3c; }
+    .error-rate-high { color: #e74c3c; font-weight: 700; }
+    .error-rate-mid { color: #f39c12; font-weight: 600; }
+    .error-rate-low { color: #27ae60; font-weight: 600; }
+    .logic-fill-bar {
+      display: inline-block;
+      height: 6px;
+      border-radius: 3px;
+      vertical-align: middle;
+      margin-left: 4px;
+    }
+    .logic-fill-bar-red { background: #e74c3c; }
+    .logic-fill-bar-amber { background: #f39c12; }
+    .logic-fill-bar-green { background: #27ae60; }
+    .logic-fill-summary {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .logic-fill-summary-item {
+      font-size: 12px;
+      color: var(--text-sec);
+      background: var(--brand-50);
+      padding: 4px 12px;
+      border-radius: 8px;
+      border: 0.5px solid var(--brand-200);
+    }
+    .logic-fill-summary-item b {
+      color: var(--text-900);
+      font-weight: 700;
+    }
+
+    /* ── 题目卡片 ── */
+    .whole-item {
+      background: var(--card);
+      border: 0.5px solid var(--border-light);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 14px;
+      transition: all 0.3s;
+      animation: cardReveal 0.5s var(--ease-decel) both;
+    }
+    .whole-item:hover {
+      box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+      border-color: var(--g-200);
+    }
+
+    @keyframes cardReveal {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* 题目标题行 */
+    .quz-item .quz-title-wrong,
+    .quz-item .quz-title-timeout,
+    .quz-item .quz-title-correct {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.25s;
+    }
+    .quz-title-wrong {
+      background: #fef0ee;
+      color: #c0392b;
+      border-left: 3px solid #e74c3c;
+    }
+    .quz-title-timeout {
+      background: #fef9ee;
+      color: #b8860b;
+      border-left: 3px solid #f39c12;
+    }
+    .quz-title-correct {
+      background: var(--success-pale);
+      color: #248a3d;
+      border-left: 3px solid var(--success);
+    }
+    .quz-title-wrong:hover, .quz-title-timeout:hover, .quz-title-correct:hover {
+      opacity: 0.85;
+    }
+
+    .quz-tag-group {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    /* 标签 */
+    .quz-tag {
+      font-size: 11px;
+      padding: 2px 10px;
+      border-radius: 12px;
+      background: var(--g-50);
+      color: var(--g-700);
+      border: 0.5px solid var(--g-100);
+      font-weight: 500;
+    }
+    .quz-tag-collect {
+      font-size: 11px;
+      padding: 2px 10px;
+      border-radius: 12px;
+      background: #fff3e0;
+      color: #e67e22;
+      border: 1px solid #fde0c0;
+    }
+    .quz-tag-note {
+      font-size: 11px;
+      padding: 2px 10px;
+      border-radius: 12px;
+      background: #e8f5e9;
+      color: #27ae60;
+      border: 1px solid #c8e6c9;
+    }
+    .quz-tag-note-method {
+      font-size: 11px;
+      padding: 2px 10px;
+      border-radius: 12px;
+      background: #e3f2fd;
+      color: #2196f3;
+      border: 1px solid #bbdefb;
+    }
+    .quz-tag-note-acc {
+      font-size: 11px;
+      padding: 2px 10px;
+      border-radius: 12px;
+      background: #f3e5f5;
+      color: #9c27b0;
+      border: 1px solid #e1bee7;
+    }
+    .quz-tag-note-rethink {
+      font-size: 11px;
+      padding: 2px 10px;
+      border-radius: 12px;
+      background: #fff8e1;
+      color: #ff8f00;
+      border: 1px solid #ffecb3;
+    }
+    .quz-tag-word {
+      font-size: 11px;
+      padding: 2px 10px;
+      border-radius: 12px;
+      background: #f5f5f5;
+      color: #666;
+      border: 1px solid #e0e0e0;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .quz-tag-word:hover {
+      background: var(--g-100);
+      color: var(--g-700);
+    }
+    .quz-tag-1 { background: #e8f5e9; color: #27ae60; }
+    .quz-tag-2 { background: #f1f8e9; color: #689f38; }
+    .quz-tag-3 { background: #fff8e1; color: #f9a825; }
+    .quz-tag-4 { background: #fff3e0; color: #ef6c00; }
+    .quz-tag-5 { background: #fce4ec; color: #c62828; }
+
+    /* 题目内容 */
+    .quz-content-fold {
+      transition: all 0.3s;
+    }
+    .quz-content {
+      font-size: 15px;
+      line-height: 1.8;
+      color: var(--text);
+      margin: 12px 0;
+    }
+    .quz-idx {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--g-600);
+      font-family: var(--font-display);
+      margin-right: 8px;
+    }
+    .quz-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 24px;
+      margin: 12px 0;
+    }
+    .quz-options div {
+      font-size: 14px;
+      color: var(--text-sec);
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: #f8faff;
+      border: 0.5px solid #edf2fa;
+      transition: all 0.2s;
+    }
+    .quz-options div:hover {
+      background: var(--g-50);
+      border-color: var(--g-200);
+    }
+
+    /* 操作按钮行 */
+    .quz-other-fold {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px dashed var(--border-light);
+    }
+
+    /* 通用按钮 */
+    .solution-btn {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 8px;
+      text-decoration: none;
+      color: var(--g-700);
+      background: var(--g-50);
+      border: 0.5px solid var(--g-100);
+      cursor: pointer;
+      transition: all 0.25s;
+    }
+    .solution-btn:hover {
+      background: var(--g-100);
+      border-color: var(--g-200);
+    }
+    .ripple { position: relative; overflow: hidden; }
+
+    /* 解析面板 */
+    .ans-panel {
+      overflow: hidden;
+      transition: max-height 0.5s var(--ease), opacity 0.4s var(--ease);
+    }
+    .ans-panel.collapsed {
+      max-height: 0 !important;
+      opacity: 0;
+    }
+
+    /* 笔记区 */
+    .note-section {
+      background: var(--brand-50);
+      border: 0.5px solid var(--brand-200);
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin: 14px 0;
+    }
+    .note-section .note-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .note-section .note-label strong {
+      color: var(--g-700);
+      font-size: 13px;
+      font-family: var(--font-display);
+    }
+
+    /* 我的答案 */
+    .my-answer-block {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      background: var(--brand-50);
+      border: 0.5px solid var(--brand-200);
+      border-radius: 8px;
+      font-size: 13px;
+      color: var(--text-sec);
+      margin-bottom: 14px;
+    }
+    .my-answer-block b { color: var(--g-700); font-size: 15px; }
+
+    /* 视频 */
+    .video-wrap { margin: 0 0 16px; border-radius: 10px; overflow: hidden; }
+    .video-wrap video { display: block; width: 100%; max-width: 480px; border-radius: 10px; }
+
+    /* 返回链接 */
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--brand-600);
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: 980px;
+      transition: all 0.25s;
+      margin-bottom: 16px;
+    }
+    .back-link:hover { background: var(--brand-50); color: var(--brand-700); }
+
+    .noselect {
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -khtml-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+
+    /* ── 入场动画增强 ── */
+    .report-header-card {
+      animation: cardReveal 0.5s var(--ease-decel) both;
+    }
+    .stat-card-new:nth-child(1) { animation-delay: 0.14s; }
+    .stat-card-new:nth-child(2) { animation-delay: 0.20s; }
+    .stat-card-new:nth-child(3) { animation-delay: 0.26s; }
+    .stat-card-new:nth-child(4) { animation-delay: 0.32s; }
+    .logic-fill-section {
+      animation: fadeUp 0.5s var(--ease-out) 0.35s both;
+    }
+    .note-section {
+      animation: fadeUp 0.5s var(--ease-out) 0.4s both;
+    }
+    .chart-box {
+      animation: fadeUp 0.5s var(--ease-out) 0.3s both;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    /* 题目筛选导航栏按钮 */
+    .quz-nav-btn {
+      padding: 7px 18px;
+      border: 1px solid var(--ink-300);
+      background: var(--ink-100, #f0f0f3);
+      color: var(--text-pri);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s var(--ease-out);
+    }
+    .quz-nav-btn:hover {
+      border-color: var(--info);
+      background: var(--info-pale);
+      color: var(--info);
+    }
+    .quz-nav-btn.active {
+      background: var(--info);
+      border-color: var(--info);
+      color: #fff;
+      font-weight: 600;
+    }
+    #navBtnWrong.active {
+      background: var(--danger);
+      border-color: var(--danger);
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+
+<div class="page-wrap">
+  <!-- 词语列表 -->
+  <ul class="word-list"></ul>
+
+  <input id="costArr" value="<%= JSON.stringify(costArr) %>" type="hidden">
+
+  <a href="/history-category-complex" class="back-link">&#x2190; 返回练习列表</a>
+
+  <!-- 报告头部卡片 -->
+  <div class="report-header-card">
+    <div class="report-title-row">
+      <div>
+        <h2><%= cleanTitle(exercise.sheet.name) %></h2>
+        <div class="report-meta">
+          <span><%= moment(exercise.updatedTime).format('YYYY年MM月DD日 HH:mm') %></span>
+          <span>耗时 <b><%= Math.round(moment.duration(exercise.elapsedTime,'seconds').asMinutes().toFixed(1)) %></b> 分钟</span>
+        </div>
+      </div>
+      <div class="report-actions">
+        <a class="btn-outline" target="_blank" href="https://www.fenbi.com/spa/tiku/report/exam/solution/xingce/xingce/<%= exercise.id %>/4">粉笔报告</a>
+        <a class="btn-primary" target="_blank" href="https://tiku.fenbi.com/api/xingce/exercises/<%= exercise.id %>/pdf">导出 PDF</a>
+        <a class="btn-outline" id="expand-btn" href="javascript:foldAll(<%= concernQuestions.map(function(i){return i.questionId}) %>)">全部收起</a>
+      </div>
+    </div>
+    <div class="source-row">
+      <% for(var sz = 0; sz < concernSourceCount.length; sz++) { var cSource = concernSourceCount[sz]; %>
+        <span class="source-tag"><%= cSource.key %>：<%= cSource.count %>题</span>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- 统计卡片 -->
+  <div class="stats-grid">
+    <div class="stat-card-new red">
+      <div class="stat-val"><%= concernQuestions.filter(function(q){return !q.correct}).length %></div>
+      <div class="stat-lbl">做错</div>
+    </div>
+    <div class="stat-card-new amber">
+      <div class="stat-val"><%= concernQuestions.filter(function(q){return q.cost > costThreshold && q.correct}).length %></div>
+      <div class="stat-lbl">超时</div>
+    </div>
+    <div class="stat-card-new red">
+      <div class="stat-val"><%= (concernQuestions.filter(function(q){return !q.correct}).length / concernQuestions.length * 100).toFixed(1) %>%</div>
+      <div class="stat-lbl">错误率</div>
+    </div>
+    <div class="stat-card-new amber">
+      <div class="stat-val"><%= (concernQuestions.filter(function(q){return q.cost > costThreshold && q.correct}).length / concernQuestions.length * 100).toFixed(1) %>%</div>
+      <div class="stat-lbl">超时率</div>
+    </div>
+    <div class="stat-card-new gray">
+      <div class="stat-val">耗时 &gt; <%= costThreshold %>s</div>
+      <div class="stat-lbl">超时阈值</div>
+    </div>
+  </div>
+
+  <!-- 图表 -->
+  <div class="chart-box">
+    <div id="costChart"></div>
+  </div>
+
+  <% if (logicFillTotal > 0) { %>
+  <!-- 逻辑填空选项词语分析 -->
+  <div class="logic-fill-section">
+    <div class="logic-fill-title">逻辑填空 · 选项词语分析</div>
+    <div class="logic-fill-summary">
+      <span class="logic-fill-summary-item">逻辑填空总题数：<b><%= logicFillTotal %></b></span>
+      <span class="logic-fill-summary-item">涉及词语数：<b><%= wordStatsList.length %></b></span>
+    </div>
+
+    <% if (wordStatsList.length > 0) { %>
+    <div class="logic-fill-subtitle">词语频次统计（点击词语跳转到对应错题）</div>
+    <table class="logic-fill-table">
+      <thead>
+        <tr>
+          <th style="text-align:left;">词语</th>
+          <th>出现次数</th>
+          <th>关联题数</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% wordStatsList.forEach(function(item) {
+          var qids = item.questionIds || [];
+        %>
+        <tr>
+          <td><a href="javascript:void(0)" onclick="scrollToWordQuestions('<%= item.word %>', [<%= qids.join(',') %>])" style="font-weight:700; color:var(--text-900); text-decoration:none; border-bottom:1px dashed var(--brand-600);"><%= item.word %></a></td>
+          <td><%= item.total %></td>
+          <td><%= qids.length %></td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+    <% } else { %>
+    <div style="text-align:center; padding:30px; color:var(--text-ter);">
+      <p>暂无词语数据</p>
+    </div>
+    <% } %>
+  </div>
+  <% } %>
+
+  <!-- 题目列表导航栏：切换全部/仅错题 -->
+  <div class="quz-nav-bar" style="display:flex; gap:10px; align-items:center; margin:18px 0 12px; flex-wrap:wrap;">
+    <span class="quz-nav-label" style="font-size:14px; color:var(--text-ter);">题目筛选：</span>
+    <button class="quz-nav-btn active" id="navBtnAll" onclick="filterQuestions('all')">全部题目</button>
+    <button class="quz-nav-btn" id="navBtnWrong" onclick="filterQuestions('wrong')">仅错题</button>
+    <span class="quz-nav-count" id="navCount" style="font-size:12px; color:var(--text-ter);"></span>
+  </div>
+
+  <!-- 题目列表 -->
+  <% for (var qi = 0; qi < concernQuestions.length; qi++) {
+    var q = concernQuestions[qi];
+    var titleClass = !q.correct ? 'quz-title-wrong' : (q.cost > costThreshold ? 'quz-title-timeout' : 'quz-title-correct');
+    var tags = (q.keypoints || []).concat(q.tags || []);
+    var hasNote = q.note && q.note.length > 0;
+    var hasMethod = hasNote && q.note.indexOf('[方法]') >= 0;
+    var hasAccum = hasNote && q.note.indexOf('[积累]') >= 0;
+    var hasExample = hasNote && q.note.indexOf('[例题]') >= 0;
+    var hasRethink = hasNote && q.note.indexOf('[反思]') >= 0;
+    var hasSummary = hasNote && q.note.indexOf('[总结]') >= 0;
+    var isPlainNote = hasNote && !hasMethod && !hasAccum && !hasExample && !hasRethink && !hasSummary;
+
+    var ratioLevel = q.correctRatio > 80 ? 1 : q.correctRatio > 60 ? 2 : q.correctRatio > 40 ? 3 : q.correctRatio > 20 ? 4 : 5;
+  %>
+  <div class="whole-item" id="<%= q.questionId %>" data-correct="<%= q.correct ? '1' : '0' %>" style="animation-delay:<%= qi * 0.04 %>s">
+    <div id="<%= q.questionId %>-tag" style="display:flex; gap:5px; flex-wrap:wrap; margin-bottom:8px;">
+      <% if (q.tagList && q.tagList.length > 0) {
+        for (var ti = 0; ti < q.tagList.length; ti++) { %>
+          <span class="quz-tag" style="background:var(--ink-700); color:#fff; border-color:var(--ink-700);"><%= q.tagList[ti] %></span>
+        <% }
+      }
+      for (var tk = 0; tk < tags.length; tk++) { %>
+        <span class="quz-tag"><%= tags[tk] %></span>
+      <% } %>
+    </div>
+
+    <% if (q.wordList && q.wordList.length > 0) { %>
+      <div style="display:flex; gap:5px; flex-wrap:wrap; margin-bottom:8px;">
+        <% for (var wi = 0; wi < q.wordList.length; wi++) { %>
+          <span class="quz-tag-word" onclick="fetchZjWord(`<%= q.wordList[wi] %>`)"><%= q.wordList[wi] %></span>
+        <% } %>
+      </div>
+    <% } %>
+
+    <div class="quz-item">
+      <div class="<%= titleClass %> noselect" onclick="hideContent(<%= q.questionId %>)">
+        <span><%= cleanTitle(q.source) %></span>
+        <span class="quz-tag-group">
+          <% if (q.hasCollect) { %><span class="quz-tag-collect" id="quz-tag-collect-<%= q.questionId %>">收藏</span><% } %>
+          <% if (isPlainNote) { %><span class="quz-tag-note" id="quz-tag-note-<%= q.questionId %>">笔记</span><% } %>
+          <% if (hasMethod) { %><span class="quz-tag-note-method" id="quz-tag-note-method-<%= q.questionId %>">方法</span><% } %>
+          <% if (hasAccum) { %><span class="quz-tag-note-acc" id="quz-tag-note-acc-<%= q.questionId %>">积累</span><% } %>
+          <% if (hasExample) { %><span class="quz-tag-note-acc" id="quz-tag-note-example-<%= q.questionId %>">例题</span><% } %>
+          <% if (hasRethink) { %><span class="quz-tag-note-rethink" id="quz-tag-note-rethink-<%= q.questionId %>">反思</span><% } %>
+          <% if (hasSummary) { %><span class="quz-tag-note-rethink" id="quz-tag-note-summary-<%= q.questionId %>">总结</span><% } %>
+          <span class="quz-tag"><%= q.cost ? '耗时'+q.cost+'秒' : '未完成' %></span>
+          <span class="quz-tag-<%= ratioLevel %>">正确率 <%= q.correctRatio.toFixed(2) %>%</span>
+          <span class="quz-tag"><%= q.totalCount %></span>
+        </span>
+      </div>
+
+      <div class="quz-content-fold" id="quz-content-<%= q.questionId %>">
+        <% if (q.material) { %><div class="quz-content"><%- q.material %></div><% } %>
+        <span class="quz-idx"><%- q.idx %>.</span>
+        <div class="quz-content"><%- q.content %></div>
+        <div class="quz-options">
+          <% for (var oi = 0; oi < q.options.length; oi++) {
+            if (q.options[oi].indexOf('<p>') === 0) { %>
+              <div><%= ['A','B','C','D'][oi] + '. ' %><%- q.options[oi].replace(/^<p>/g,'').replace(/<\/p>$/g,'') %></div>
+            <% } else { %>
+              <div><%= ['A','B','C','D'][oi] + '. ' %><%- q.options[oi] %></div>
+            <% }
+          } %>
+        </div>
+      </div>
+    </div>
+
+    <div class="quz-other-fold">
+      <a class="solution-btn ripple" id="show-ans-<%= q.questionId %>" href="javascript:showSolution(<%= q.questionId %>);">查看解析</a>
+      <a class="solution-btn ripple" id="show-comment-<%= q.questionId %>" href="javascript:showComment(<%= q.questionId %>);">查看评论</a>
+      <a class="solution-btn ripple" id="show-video-<%= q.questionId %>" href="javascript:showVideoSolution(<%= q.questionId %>);">视频解析</a>
+      <a class="solution-btn ripple" id="collect-<%= q.questionId %>" href="javascript:collect(<%= q.questionId %>);"><%= q.hasCollect ? '取消收藏' : '收藏' %></a>
+      <a class="solution-btn ripple" id="copy-<%= q.questionId %>" href="javascript:copyContent(<%= q.questionId %>);">复制</a>
+    </div>
+
+    <div class="video-wrap" id="video-wrap-<%= q.questionId %>" style="display:none;">
+      <video id="video-<%= q.questionId %>" controls></video>
+    </div>
+    <ul class="comment-list" id="comment-<%= q.questionId %>"></ul>
+
+    <div class="ans-panel collapsed" id="ans-<%= q.questionId %>">
+      <div class="note-section">
+        <div class="note-label">
+          <strong>笔记</strong>
+          <a class="solution-btn" id="save-note-<%= q.questionId %>" href="javascript:saveNote(<%= q.questionId %>);">保存笔记</a>
+        </div>
+        <div><textarea id="mdNote-<%= q.questionId %>"></textarea></div>
+        <span id="note-<%= q.questionId %>" style="display:none;" class="note-area"><%= q.note %></span>
+      </div>
+      <div class="my-answer-block">
+        我的选择：<b><%= q.myAnswer %></b>
+      </div>
+      <div class="quz-content" id="solution-<%= q.questionId %>"></div>
+    </div>
+  </div>
+  <% } %>
+</div>
+
+<script>
+  // ── 题目筛选：全部 / 仅错题 ──
+  function filterQuestions(mode) {
+    var items = document.querySelectorAll('.whole-item');
+    var wrongCount = 0, totalCount = 0;
+    items.forEach(function(el) {
+      totalCount++;
+      var isWrong = el.getAttribute('data-correct') === '0';
+      if (isWrong) wrongCount++;
+      if (mode === 'wrong') {
+        el.style.display = isWrong ? '' : 'none';
+      } else {
+        el.style.display = '';
+      }
+    });
+    document.getElementById('navBtnAll').classList.toggle('active', mode === 'all');
+    document.getElementById('navBtnWrong').classList.toggle('active', mode === 'wrong');
+    document.getElementById('navCount').textContent = mode === 'wrong'
+      ? '显示错题 ' + wrongCount + ' / ' + totalCount + ' 题'
+      : '共 ' + totalCount + ' 题（错题 ' + wrongCount + '）';
+  }
+  // 初始化计数
+  document.addEventListener('DOMContentLoaded', function() {
+    filterQuestions('all');
+  });
+
+  // ── Scroll entrance animations ──
+  (function(){
+    var els = document.querySelectorAll('.anim-in');
+    if(!els.length) return;
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){ e.target.classList.add('visible'); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+    els.forEach(function(el){ io.observe(el); });
+  })();
+
+  var costThreshold = <%= costThreshold %>;
+  var costArr = JSON.parse(document.getElementById('costArr').value);
+
+  // 工具函数
+  function avg(arr) { return arr.reduce(function(a,b){return a+b;},0) / arr.length; }
+  function percentile(p, arr) {
+    var sorted = arr.slice().sort(function(a,b){return a-b;});
+    var idx = (p / 100) * (sorted.length - 1);
+    var lower = Math.floor(idx);
+    var upper = Math.ceil(idx);
+    if (lower === upper) return sorted[lower];
+    return sorted[lower] + (idx - lower) * (sorted[upper] - sorted[lower]);
+  }
+
+  // 图表
+  var myChart = echarts.init(document.getElementById('costChart'));
+  var cumData = [], sum = 0;
+  costArr.forEach(function(item){ sum += item.cost; cumData.push(sum); });
+  var percentData = [];
+  var accCorrect = 0;
+  costArr.forEach(function(item, idx){ accCorrect += item.correct ? 1 : 0; percentData.push((accCorrect / (idx+1) * 100).toFixed(1)); });
+
+  var costDatas = costArr.map(function(item){ return { idx: item.idx, cost: item.cost, correct: item.correct }; });
+
+  var option = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    legend: { data: ['耗时','累计耗时','正确率'], bottom: 0, textStyle: { fontSize: 11 } },
+    grid: { left: 50, right: 50, top: 20, bottom: 40 },
+    xAxis: [
+      { type: 'category', data: costArr.map(function(i){ return i.idx; }), axisLabel: { fontSize: 10 } },
+      { type: 'category', data: costArr.map(function(i){ return i.idx; }), show: false }
+    ],
+    yAxis: [
+      { type: 'value', name: '耗时(秒)', axisLabel: { fontSize: 10 } },
+      { type: 'value', name: '累计(秒)', position: 'right', axisLabel: { fontSize: 10 } },
+      { type: 'value', name: '正确率%', position: 'right', offset: 50, axisLabel: { fontSize: 10 }, min: 0, max: 100 }
+    ],
+    series: [
+      { name:'耗时', type:'bar', data: costDatas.map(function(item){ var itemStyle; if (!item.correct) { itemStyle = { borderColor:'#c94433', borderWidth:2 }; } return { value:item.cost, itemStyle:itemStyle }; }),
+        markLine: { silent:true, itemStyle:{normal:{lineStyle:{},label:{show:true,position:'end'}}}, data:[{name:'80分位数',yAxis:percentile(80, costArr.map(function(i){return i.cost}))}] }
+      },
+      { name:'累计耗时', type:'line', smooth:true, data: cumData, yAxisIndex:1, areaStyle:{color:'rgba(0,102,204,0.15)'} },
+      { name:'正确率', type:'line', smooth:true, data: percentData, xAxisIndex:1, yAxisIndex:2,
+        markLine: { silent:true, itemStyle:{normal:{lineStyle:{},label:{show:true,position:'end'}}}, data:[{name:'平均正确率',yAxis:(100 - avg(costArr.map(function(i){return i.correctRatio*100}))).toFixed(1)}] }
+      }
+    ],
+    color: ['#0066cc', '#3b9dff', '#c94433']
+  };
+  myChart.setOption(option);
+
+  // 题目内容折叠
+  function hideContent(questionId) {
+    var el = document.getElementById('quz-content-' + questionId);
+    if (el.style.display === 'none') {
+      el.style.display = 'block';
+    } else {
+      el.style.display = 'none';
+    }
+  }
+
+  // 解析
+  function showSolution(questionId) {
+    var el = document.getElementById('ans-' + questionId);
+    var btn = document.getElementById('show-ans-' + questionId);
+    if (el.classList.contains('collapsed')) {
+      el.classList.remove('collapsed');
+      el.style.maxHeight = el.scrollHeight + 'px';
+      btn.innerHTML = '收起解析';
+    } else {
+      el.classList.add('collapsed');
+      btn.innerHTML = '查看解析';
+    }
+  }
+
+  // 评论
+  function showComment(questionId) {
+    var comment = document.getElementById('comment-' + questionId);
+    if (comment.style.display === 'none') {
+      if (comment.innerHTML) {
+        comment.style.display = 'block';
+        document.getElementById('show-comment-'+questionId).innerHTML = '收起评论';
+        return;
+      }
+      fetch('/api/comment/'+questionId)
+        .then(function(r){ return r.ok?r.json():null; })
+        .then(function(datas){
+          if(!datas) return;
+          document.getElementById('show-comment-'+questionId).innerHTML = '收起评论';
+          datas.forEach(function(d){
+            var li = document.createElement('li');
+            li.innerText = d.comment + ' (' + d.likeCount + ')';
+            comment.appendChild(li);
+          });
+          comment.style.display = 'block';
+        });
+    } else {
+      document.getElementById('show-comment-'+questionId).innerHTML = '查看评论';
+      comment.style.display = 'none';
+    }
+  }
+
+  // 视频
+  function showVideoSolution(questionId) {
+    var video = document.getElementById('video-' + questionId);
+    var wrap = document.getElementById('video-wrap-' + questionId);
+    if (wrap.style.display === 'none') {
+      if (video.currentSrc) { wrap.style.display = 'block'; return; }
+      fetch('/api/video/'+questionId)
+        .then(function(r){ return r.ok?r.text():null; })
+        .then(function(url){
+          if(!url) return;
+          document.getElementById('show-video-'+questionId).innerHTML = '收起视频';
+          var source = document.createElement('source');
+          source.type = 'video/mp4'; source.src = url;
+          video.appendChild(source);
+          wrap.style.display = 'block';
+        });
+    } else {
+      video.pause();
+      wrap.style.display = 'none';
+      document.getElementById('show-video-'+questionId).innerHTML = '视频解析';
+    }
+  }
+
+  // 收藏
+  function collect(questionId) {
+    var tag = document.getElementById('quz-tag-collect-'+questionId);
+    var btn = document.getElementById('collect-'+questionId);
+    if (tag && tag.style.display === 'none') {
+      fetch('/api/collect/'+questionId, {method:'POST'})
+        .then(function(r){ if(r.ok){ tag.style.display='inline'; btn.innerHTML='取消收藏'; } });
+    } else {
+      fetch('/api/collect/'+questionId, {method:'DELETE'})
+        .then(function(r){ if(r.ok){ if(tag) tag.style.display='none'; btn.innerHTML='收藏'; } });
+    }
+  }
+
+  // 复制
+  function copyContent(questionId) {
+    var str = document.getElementById(questionId).innerHTML;
+    function listener(e){ e.clipboardData.setData('text/html',str); e.clipboardData.setData('text/plain',str); e.preventDefault(); }
+    document.addEventListener('copy', listener);
+    document.execCommand('copy');
+    document.removeEventListener('copy', listener);
+    showToast('已复制到剪贴板');
+  }
+
+  // Toast提示
+  function showToast(msg) {
+    var t = document.createElement('div');
+    t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;transition:opacity 0.3s;';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(function(){ t.style.opacity = '0'; }, 1800);
+    setTimeout(function(){ t.remove(); }, 2200);
+  }
+
+  // 笔记
+  var mdOptions = {
+    autofocus: false, forceSync: true, autoRefresh: {delay: 300},
+    hideIcons: ['guide','heading'], minHeight: '250px', maxHeight: '250px',
+    parsingConfig: {allowAtxHeaderWithoutSpace: true, strikethrough: false, underscoresBreakWords: true},
+    placeholder: '请输入笔记', showIcons: ['code','table'], spellChecker: false,
+    status: false, styleSelectedText: false, sideBySideFullscreen: false,
+    syncSideBySidePreviewScroll: false, tabSize: 4, toolbarTips: false
+  };
+
+  var mdeMap = {};
+  function genMdNote(){
+    var ids = [].slice.call(arguments);
+    ids.forEach(function(questionId){
+      var el = document.getElementById('mdNote-'+questionId);
+      if (!el) return;
+      var easyMDE = new EasyMDE(Object.assign({}, mdOptions, {element: el}));
+      mdeMap[questionId] = easyMDE;
+      var content = document.getElementById('note-'+questionId).innerText;
+      if (content.length > 0) { easyMDE.value(content); easyMDE.togglePreview(); }
+    });
+  }
+
+  function saveNote(questionId) {
+    var noteContent = mdeMap[questionId].value();
+    fetch('/api/saveNote/'+questionId, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({noteContent: noteContent})
+    }).then(function(r){
+      if (!r.ok) { showToast('笔记保存失败'); return; }
+      showToast('笔记已保存');
+      return r.json();
+    });
+  }
+
+  // 全部展开/收起
+  var fold = false;
+  function foldAll(){
+    var ids = Array.prototype.slice.call(arguments);
+    fold = !fold;
+    document.getElementById('expand-btn').innerHTML = fold ? '全部展开' : '全部收起';
+    for (var i = 0; i < ids.length; i++) {
+      var el = document.getElementById('quz-content-' + ids[i]);
+      if (el) el.style.display = fold ? 'none' : 'block';
+    }
+  }
+
+  // 跳转
+  function jumpTo(questionId) {
+    document.getElementById(questionId).scrollIntoView({behavior:'smooth',block:'start'});
+  }
+
+  // 查词
+  function fetchZjWord(word){
+    fetch('/api/zj',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({word:word})})
+      .then(function(r){return r.ok?r.text():null;})
+      .then(function(res){if(res)window.open(res,'_blank');});
+  }
+
+  // 点击词语跳转到对应错题
+  function scrollToWordQuestions(word, questionIds) {
+    console.log('[SCROLL] word:', word, 'questionIds:', questionIds);
+    // 先确保所有题目都已展开
+    questionIds.forEach(function(qid) {
+      var el = document.getElementById('quz-content-' + qid);
+      if (el && el.style.display === 'none') {
+        el.style.display = 'block';
+      }
+    });
+
+    // 滚动到第一个匹配的题目
+    var targetId = questionIds[0];
+    var target = document.getElementById(targetId);
+    console.log('[SCROLL] targetId:', targetId, 'target:', target);
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // 高亮闪烁效果
+      target.style.transition = 'background 0.3s';
+      target.style.background = '#fff9c4';
+      setTimeout(function() { target.style.background = ''; }, 2000);
+    } else {
+      console.error('[SCROLL] Element not found for id:', targetId);
+    }
+  }
+
+  // 初始化笔记
+  genMdNote(<%= concernQuestions.map(function(i){return i.questionId}) %>);
+</script>
+</body>
+</html>

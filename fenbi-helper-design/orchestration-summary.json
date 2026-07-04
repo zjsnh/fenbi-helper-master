@@ -1,0 +1,239 @@
+{
+  "project": {
+    "operation": "create",
+    "designRead": "tool app / exam preparation students / calm professional / medium density / avoid playful or overly casual",
+    "designDials": {
+      "layoutVariance": 2,
+      "motionIntensity": 2,
+      "visualDensity": 3
+    },
+    "sharedProjectShellContract": {
+      "navigation": "sticky top nav with frosted glass, Apple-style nav links",
+      "primaryColorSystem": "brand-600 #0066cc, background-50 #f5f5f7, background-900 #0a0a0a",
+      "typeStack": "DM Sans for headings and UI, JetBrains Mono for numeric data",
+      "radiusScale": "1.2rem cards/sections, 980px pill buttons, 18px inputs",
+      "surfaceDepthModel": "1px borders at rest, whisper-light shadows on hover only",
+      "ctaStyle": "pill-shaped primary/secondary buttons",
+      "alignmentRhythm": "center-aligned hero, left-aligned content sections"
+    },
+    "generationTree": {
+      "nodeId": "gen-project-shell",
+      "kind": "project-shell",
+      "pageIds": [],
+      "output": "partials/project-shell.html",
+      "sharedRegions": ["sticky frosted-glass nav", "root layout frame", "brand CSS link"],
+      "privateRegions": [],
+      "mutableSlots": ["activeNavItem"],
+      "status": "planned",
+      "children": [
+        {
+          "nodeId": "gen-page-login",
+          "kind": "page-leaf",
+          "pageIds": ["page-login"],
+          "output": "pages/login.html",
+          "sharedRegions": [],
+          "privateRegions": ["full page content"],
+          "mutableSlots": [],
+          "status": "planned",
+          "children": []
+        },
+        {
+          "nodeId": "gen-page-history",
+          "kind": "page-leaf",
+          "pageIds": ["page-history"],
+          "output": "pages/history.html",
+          "sharedRegions": [],
+          "privateRegions": ["full page content"],
+          "mutableSlots": [],
+          "status": "planned",
+          "children": []
+        },
+        {
+          "nodeId": "gen-page-question",
+          "kind": "page-leaf",
+          "pageIds": ["page-question"],
+          "output": "pages/question.html",
+          "sharedRegions": [],
+          "privateRegions": ["full page content"],
+          "mutableSlots": [],
+          "status": "planned",
+          "children": []
+        },
+        {
+          "nodeId": "gen-page-wrong-questions",
+          "kind": "page-leaf",
+          "pageIds": ["page-wrong-questions"],
+          "output": "pages/wrong-questions.html",
+          "sharedRegions": [],
+          "privateRegions": ["full page content"],
+          "mutableSlots": [],
+          "status": "planned",
+          "children": []
+        },
+        {
+          "nodeId": "gen-page-search",
+          "kind": "page-leaf",
+          "pageIds": ["page-search"],
+          "output": "pages/search.html",
+          "sharedRegions": [],
+          "privateRegions": ["full page content"],
+          "mutableSlots": [],
+          "status": "planned",
+          "children": []
+        }
+      ]
+    }
+  },
+  "designSource": {
+    "mode": "library-bound",
+    "libraryIdentity": {
+      "name": "苹果",
+      "id": "dl_builtin_apple",
+      "version": 1,
+      "scope": "built-in-global",
+      "path": "c:\\Users\\30780\\.trae-cn\\design_libraries\\dl_builtin_apple",
+      "versionSource": "metadata.json"
+    },
+    "brandPrefix": "apple",
+    "brandCssPath": "c:\\Users\\30780\\.trae-cn\\design_libraries\\dl_builtin_apple\\colors_and_type.css",
+    "componentCssPath": "c:\\Users\\30780\\.trae-cn\\design_libraries\\dl_builtin_apple\\components.css",
+    "styleConstraints": {
+      "radiusMax": 16,
+      "spacingBase": 4,
+      "fontSizeBody": 14,
+      "fontSizeMin": 12,
+      "controlHeightDefault": 44,
+      "controlHeightLarge": 48,
+      "staticShadowAlphaMax": 0.05
+    }
+  },
+  "pages": [
+    {
+      "nodeId": "page-login",
+      "title": "登录",
+      "htmlSrc": "pages/login.html",
+      "pageIndex": 1,
+      "visualNorthStar": "Clean, centered login form with frosted-glass card on subtle gradient background, Apple-calm aesthetic",
+      "compositionPattern": "centered-signle-panel",
+      "continuityAnchors": [
+        "sticky frosted-glass nav",
+        "pill-shaped primary button",
+        "DM Sans typography",
+        "background-50 surface color"
+      ],
+      "componentPlan": [
+        { "component": "input", "slug": "input", "reason": "phone and password input fields" },
+        { "component": "button", "slug": "button", "reason": "login CTA button" },
+        { "component": "navigation", "slug": "navigation", "reason": "top navigation bar" }
+      ],
+      "imagePlan": [],
+      "chartsRequired": false
+    },
+    {
+      "nodeId": "page-history",
+      "title": "练习历史",
+      "htmlSrc": "pages/history.html",
+      "pageIndex": 2,
+      "visualNorthStar": "Category-based exercise history dashboard with expandable sections, clean data hierarchy",
+      "compositionPattern": "structured-data-list",
+      "continuityAnchors": [
+        "sticky frosted-glass nav",
+        "pill-shaped primary button",
+        "DM Sans typography",
+        "background-50 surface color"
+      ],
+      "componentPlan": [
+        { "component": "card", "slug": "card", "reason": "exercise category cards" },
+        { "component": "navigation", "slug": "navigation", "reason": "top navigation bar" },
+        { "component": "button", "slug": "button", "reason": "action buttons" }
+      ],
+      "imagePlan": [],
+      "chartsRequired": false
+    },
+    {
+      "nodeId": "page-question",
+      "title": "题目详情",
+      "htmlSrc": "pages/question.html",
+      "pageIndex": 3,
+      "visualNorthStar": "Clean question detail page with clear type hierarchy, answer/explanation sections, video link",
+      "compositionPattern": "content-detail",
+      "continuityAnchors": [
+        "sticky frosted-glass nav",
+        "pill-shaped primary button",
+        "DM Sans typography",
+        "background-50 surface color"
+      ],
+      "componentPlan": [
+        { "component": "card", "slug": "card", "reason": "question content card" },
+        { "component": "button", "slug": "button", "reason": "action buttons (collect, video)" },
+        { "component": "navigation", "slug": "navigation", "reason": "top navigation bar" }
+      ],
+      "imagePlan": [],
+      "chartsRequired": false
+    },
+    {
+      "nodeId": "page-wrong-questions",
+      "title": "错题本",
+      "htmlSrc": "pages/wrong-questions.html",
+      "pageIndex": 4,
+      "visualNorthStar": "Wrong questions notebook with category sidebar and question list, clean study-tool feel",
+      "compositionPattern": "dual-panel-data",
+      "continuityAnchors": [
+        "sticky frosted-glass nav",
+        "pill-shaped primary button",
+        "DM Sans typography",
+        "background-50 surface color"
+      ],
+      "componentPlan": [
+        { "component": "card", "slug": "card", "reason": "wrong question cards" },
+        { "component": "navigation", "slug": "navigation", "reason": "top navigation bar" },
+        { "component": "button", "slug": "button", "reason": "action buttons" }
+      ],
+      "imagePlan": [],
+      "chartsRequired": false
+    },
+    {
+      "nodeId": "page-search",
+      "title": "搜索",
+      "htmlSrc": "pages/search.html",
+      "pageIndex": 5,
+      "visualNorthStar": "Minimal search page with prominent search input and instant results below",
+      "compositionPattern": "search-results",
+      "continuityAnchors": [
+        "sticky frosted-glass nav",
+        "pill-shaped primary button",
+        "DM Sans typography",
+        "background-50 surface color"
+      ],
+      "componentPlan": [
+        { "component": "input", "slug": "input", "reason": "search input field" },
+        { "component": "card", "slug": "card", "reason": "search result cards" },
+        { "component": "navigation", "slug": "navigation", "reason": "top navigation bar" }
+      ],
+      "imagePlan": [],
+      "chartsRequired": false
+    }
+  ],
+  "assets": [],
+  "wiringPlan": [
+    { "source": "page-login", "domId": "cta-login", "target": "page-history", "label": "登录成功" },
+    { "source": "page-history", "domId": "cta-question", "target": "page-question", "label": "查看练习" },
+    { "source": "page-history", "domId": "nav-wrong", "target": "page-wrong-questions", "label": "错题本" },
+    { "source": "page-history", "domId": "nav-search", "target": "page-search", "label": "搜索" },
+    { "source": "page-question", "domId": "nav-back", "target": "page-history", "label": "返回", "hideEdge": true },
+    { "source": "page-wrong-questions", "domId": "nav-back", "target": "page-history", "label": "返回", "hideEdge": true },
+    { "source": "page-search", "domId": "nav-back", "target": "page-history", "label": "返回", "hideEdge": true },
+    { "source": "page-search", "domId": "cta-result", "target": "page-question", "label": "查看题目" },
+    { "source": "page-wrong-questions", "domId": "cta-wrong-detail", "target": "page-question", "label": "查看错题" }
+  ],
+  "hiddenInteractionPlan": [
+    { "source": "page-history", "domId": "nav-login", "target": "page-login", "label": "退出登录", "hideEdge": true },
+    { "source": "page-question", "domId": "nav-home", "target": "page-history", "label": "首页", "hideEdge": true },
+    { "source": "page-question", "domId": "nav-wrong", "target": "page-wrong-questions", "label": "错题本", "hideEdge": true },
+    { "source": "page-question", "domId": "nav-search", "target": "page-search", "label": "搜索", "hideEdge": true },
+    { "source": "page-wrong-questions", "domId": "nav-home", "target": "page-history", "label": "首页", "hideEdge": true },
+    { "source": "page-wrong-questions", "domId": "nav-search", "target": "page-search", "label": "搜索", "hideEdge": true },
+    { "source": "page-search", "domId": "nav-home", "target": "page-history", "label": "首页", "hideEdge": true },
+    { "source": "page-search", "domId": "nav-wrong", "target": "page-wrong-questions", "label": "错题本", "hideEdge": true }
+  ]
+}

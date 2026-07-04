@@ -1,0 +1,377 @@
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 · 粉笔助手</title>
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    .login-page {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: var(--paper);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* 动态背景 — Apple 极简光斑 */
+    .login-page .bg-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .login-page .bg-layer::before {
+      content: '';
+      position: absolute;
+      width: 600px; height: 600px;
+      top: -20%; right: -15%;
+      background: radial-gradient(circle, rgba(0,102,204,0.04) 0%, transparent 70%);
+      animation: driftA 20s ease-in-out infinite;
+    }
+    .login-page .bg-layer::after {
+      content: '';
+      position: absolute;
+      width: 500px; height: 500px;
+      bottom: -15%; left: -10%;
+      background: radial-gradient(circle, rgba(0,102,204,0.03) 0%, transparent 70%);
+      animation: driftB 24s ease-in-out infinite;
+    }
+    @keyframes driftA {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(-30px, 20px) scale(1.05); }
+      66% { transform: translate(15px, -15px) scale(0.97); }
+    }
+    @keyframes driftB {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(20px, -25px) scale(1.04); }
+      66% { transform: translate(-10px, 10px) scale(0.96); }
+    }
+
+    .orb { display: none; }
+
+    /* 登录卡片 — Apple 毛玻璃 */
+    .login-card {
+      width: 400px;
+      background: rgba(255,255,255,0.72);
+      backdrop-filter: blur(40px) saturate(1.8);
+      -webkit-backdrop-filter: blur(40px) saturate(1.8);
+      border-radius: 20px;
+      padding: 48px 44px 40px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.06), 0 2px 8px rgba(0,0,0,0.04);
+      border: 0.5px solid rgba(0,0,0,0.08);
+      position: relative;
+      z-index: 1;
+      animation: cardRise 0.6s var(--ease-out) both;
+    }
+    @keyframes cardRise {
+      from { opacity:0; transform:translateY(20px) scale(0.98); }
+      to   { opacity:1; transform:translateY(0) scale(1); }
+    }
+
+    .login-card::before { display: none; }
+    .login-card::after { display: none; }
+
+    .login-card .brand {
+      text-align: center;
+      margin-bottom: 12px;
+    }
+    .login-card .brand .logo-img {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      object-fit: cover;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      transition: transform var(--dur-slow) var(--ease-out);
+      animation: logoBounce 0.7s var(--ease-out) 0.2s both;
+    }
+    @keyframes logoBounce {
+      from { opacity:0; transform:scale(0.6); }
+      to   { opacity:1; transform:scale(1); }
+    }
+    .login-card .brand .logo-img:hover {
+      transform: scale(1.06);
+    }
+    .login-card h1 {
+      font-size: 24px;
+      font-weight: 700;
+      font-family: var(--font-sans);
+      color: var(--text-900);
+      letter-spacing: -0.3px;
+      animation: fadeUp 0.4s var(--ease-out) 0.3s both;
+    }
+    .login-card .sub {
+      font-size: 13px;
+      color: var(--text-500);
+      margin-top: 4px;
+      margin-bottom: 32px;
+      letter-spacing: 0;
+      animation: fadeUp 0.4s var(--ease-out) 0.36s both;
+    }
+
+    .field {
+      margin-bottom: 18px;
+      position: relative;
+      animation: fadeUp 0.4s var(--ease-out) both;
+    }
+    .field:nth-child(1) { animation-delay: 0.4s; }
+    .field:nth-child(2) { animation-delay: 0.46s; }
+
+    .field label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-700);
+      margin-bottom: 6px;
+      letter-spacing: 0;
+    }
+    .field .input-wrap {
+      position: relative;
+    }
+    .field .input-wrap .icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      color: var(--text-400);
+      pointer-events: none;
+      transition: color var(--dur-normal) var(--ease-out);
+    }
+    .field input {
+      width: 100%;
+      padding: 12px 16px 12px 42px;
+      font-size: 14px;
+      font-family: inherit;
+      border: 1px solid var(--text-200);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.6);
+      color: var(--text-900);
+      outline: none;
+      transition: all var(--dur-normal) var(--ease-out);
+    }
+    .field input::placeholder { color: var(--text-400); }
+    .field input:hover { border-color: var(--text-300); }
+    .field input:focus {
+      border-color: var(--brand-600);
+      box-shadow: var(--shadow-focus);
+      background: #fff;
+    }
+    .field input:focus + .icon,
+    .field input:focus ~ .icon {
+      color: var(--brand-600);
+    }
+
+    .field .input-wrap::after { display: none; }
+
+    .btn-login {
+      width: 100%;
+      padding: 14px;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: var(--font-sans);
+      border: none;
+      border-radius: 12px;
+      background: var(--brand-600);
+      color: #fff;
+      cursor: pointer;
+      transition: all var(--dur-normal) var(--ease-out);
+      margin-top: 8px;
+      letter-spacing: 0;
+      position: relative;
+      overflow: hidden;
+      animation: fadeUp 0.4s var(--ease-out) 0.52s both;
+    }
+    .btn-login::before { display: none; }
+    .btn-login::after { display: none; }
+    .btn-login:hover {
+      background: var(--brand-700);
+      transform: none;
+      box-shadow: 0 4px 16px rgba(0,102,204,0.25);
+    }
+    .btn-login:active {
+      transform: translateY(0) scale(0.98);
+    }
+    .btn-login:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+      box-shadow: none !important;
+    }
+
+    .err-msg {
+      font-size: 13px;
+      color: var(--danger);
+      text-align: center;
+      margin-top: 14px;
+      min-height: 20px;
+      transition: all var(--dur-normal) var(--ease-out);
+    }
+
+    .footer-note {
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-400);
+      margin-top: 28px;
+      letter-spacing: 0;
+      animation: fadeUp 0.4s var(--ease-out) 0.58s both;
+    }
+
+    .btn-login .loading-dots {
+      display: inline-flex;
+      gap: 4px;
+      align-items: center;
+    }
+    .btn-login .loading-dots span {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.7);
+      animation: dotPulse 1.2s ease-in-out infinite;
+    }
+    .btn-login .loading-dots span:nth-child(2) { animation-delay: 0.15s; }
+    .btn-login .loading-dots span:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes dotPulse {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+
+    .login-card.success-state {
+      animation: successBounce 0.5s var(--ease-out);
+    }
+    @keyframes successBounce {
+      0% { transform: scale(1); }
+      40% { transform: scale(1.01); }
+      100% { transform: scale(1); }
+    }
+
+    .login-card.shake {
+      animation: shakeX 0.5s var(--ease-out);
+    }
+    @keyframes shakeX {
+      0%, 100% { transform: translateX(0); }
+      15% { transform: translateX(-8px); }
+      30% { transform: translateX(7px); }
+      45% { transform: translateX(-5px); }
+      60% { transform: translateX(4px); }
+      75% { transform: translateX(-2px); }
+    }
+  </style>
+  <script src="https://nodestatic.fbstatic.cn/weblts_spa_online/page/assets/files/encrypt.js"></script>
+</head>
+<body>
+<div class="login-page">
+  <div class="bg-layer"></div>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+  <div class="orb orb-4"></div>
+
+  <form class="login-card" id="login-form">
+    <div class="brand">
+      <img src="/image.png" alt="" class="logo-img">
+      <h1>粉笔助手</h1>
+      <div class="sub">登录粉笔网账号，解锁全部功能</div>
+    </div>
+
+    <div class="field">
+      <label>手机号</label>
+      <div class="input-wrap">
+        <input id="phone" type="text" placeholder="请输入粉笔网注册手机号" autocomplete="tel">
+        <span class="icon">&#x1F4F1;</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>密码</label>
+      <div class="input-wrap">
+        <input id="password" type="password" placeholder="请输入登录密码" autocomplete="current-password">
+        <span class="icon">&#x1F512;</span>
+      </div>
+    </div>
+
+    <button id="login-btn" type="submit" class="btn-login">登 录</button>
+    <div class="err-msg" id="errmsg"></div>
+
+    <div class="footer-note">仅用于学习辅助，数据来源于粉笔网</div>
+  </form>
+</div>
+
+<script>
+  var loginCard = document.getElementById('login-form');
+
+  document.getElementById("login-btn").addEventListener('click', function(e) {
+    e.preventDefault();
+    var phone = document.getElementById("phone").value.trim();
+    var password = document.getElementById("password").value;
+    var errmsg = document.getElementById('errmsg');
+    errmsg.textContent = '';
+
+    if (!phone || !password) {
+      errmsg.textContent = '请输入手机号和密码';
+      loginCard.classList.add('shake');
+      setTimeout(function(){ loginCard.classList.remove('shake'); }, 500);
+      return;
+    }
+    if (!/^\d{11}$/.test(phone)) {
+      errmsg.textContent = '请输入有效的11位手机号';
+      loginCard.classList.add('shake');
+      setTimeout(function(){ loginCard.classList.remove('shake'); }, 500);
+      return;
+    }
+
+    var publicKey = 'ANKi9PWuvDOsagwIVvrPx77mXNV0APmjySsYjB1/GtUTY6cyKNRl2RCTt608m9nYk5VeCG2EAZRQmQNQTyfZkw0Uo+MytAkjj17BXOpY4o6+BToi7rRKfTGl6J60/XBZcGSzN1XVZ80ElSjaGE8Ocg8wbPN18tbmsy761zN5SuIl';
+
+    var encryptedPwd;
+    try {
+      encryptedPwd = window.encrypt(publicKey, password);
+    } catch(ex) {
+      errmsg.textContent = '加密模块加载失败，请刷新页面重试';
+      loginCard.classList.add('shake');
+      setTimeout(function(){ loginCard.classList.remove('shake'); }, 500);
+      return;
+    }
+
+    var btn = document.getElementById("login-btn");
+    btn.innerHTML = '<span class="loading-dots"><span></span><span></span><span></span></span>';
+    btn.disabled = true;
+
+    fetch('/api/login/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: phone, password: encryptedPwd })
+    })
+    .then(function(r) {
+      if (r.status === 200) return r.json();
+      throw new Error('服务器响应异常 (' + r.status + ')');
+    })
+    .then(function(result) {
+      if (result.code === 200) {
+        loginCard.classList.add('success-state');
+        setTimeout(function(){
+          window.location.href = result.redirectPath;
+        }, 300);
+      } else {
+        errmsg.textContent = result.message || '登录失败，请检查账号密码';
+        btn.textContent = '登 录';
+        btn.disabled = false;
+        loginCard.classList.add('shake');
+        setTimeout(function(){ loginCard.classList.remove('shake'); }, 500);
+      }
+    })
+    .catch(function(err) {
+      errmsg.textContent = '网络请求失败：' + err.message;
+      btn.textContent = '登 录';
+      btn.disabled = false;
+      loginCard.classList.add('shake');
+      setTimeout(function(){ loginCard.classList.remove('shake'); }, 500);
+    });
+  });
+
+  document.getElementById('password').addEventListener('keydown', function(e) {
+    if (e.keyCode === 13) document.getElementById('login-btn').click();
+  });
+</script>
+</body>
+</html>

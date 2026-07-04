@@ -1,0 +1,230 @@
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>练习记录 · 粉笔助手</title>
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    body { background: var(--paper); }
+    .list-view { max-width:760px; margin:0 auto; }
+
+    /* 日期分组标题 */
+    .date-group {
+      margin-bottom: 28px;
+      animation: fadeSlide 0.5s var(--ease-out) both;
+    }
+    .date-group:nth-child(1) { animation-delay: 0s; }
+    .date-group:nth-child(2) { animation-delay: 0.05s; }
+    .date-group:nth-child(3) { animation-delay: 0.1s; }
+    .date-group:nth-child(4) { animation-delay: 0.15s; }
+    .date-group:nth-child(5) { animation-delay: 0.2s; }
+
+    .date-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--g-100);
+    }
+    .date-header .date-text {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--g-700);
+      font-family: var(--font-display);
+    }
+    .date-header .date-count {
+      font-size: 12px;
+      color: var(--ink-400);
+      background: var(--g-50);
+      padding: 3px 12px;
+      border-radius: 12px;
+      font-weight: 500;
+    }
+    .date-header .deco-line {
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, var(--g-200), transparent);
+    }
+
+    /* 列表行 */
+    .ex-row {
+      display: flex;
+      align-items: center;
+      padding: 16px 20px;
+      background: var(--card);
+      border: 0.5px solid var(--border-light);
+      border-radius: var(--radius);
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.35s var(--ease-out);
+      gap: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+    .ex-row::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: linear-gradient(180deg, var(--g-300), var(--g-500));
+      transform: scaleY(0);
+      transform-origin: top;
+      transition: transform 0.3s var(--ease-out);
+    }
+    .ex-row:hover::before { transform: scaleY(1); }
+    .ex-row:hover {
+      box-shadow: var(--shadow-sm);
+      border-color: var(--g-200);
+      transform: translateX(4px);
+    }
+
+    .ex-row .rate {
+      font-size: 20px;
+      font-weight: 800;
+      font-family: var(--font-display);
+      color: var(--g-600);
+      flex-shrink: 0;
+      min-width: 52px;
+      text-align: center;
+      letter-spacing: -0.5px;
+    }
+    .ex-row .rate.high { color: var(--success); }
+    .ex-row .rate.mid { color: var(--warning); }
+    .ex-row .rate.low { color: var(--danger); }
+
+    .ex-row .main { flex:1; min-width:0; }
+    .ex-row .title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ex-row:hover .title { color: var(--g-700); }
+    .ex-row .meta {
+      display: flex;
+      gap: 6px;
+      margin-top: 4px;
+      flex-wrap: wrap;
+    }
+    .ex-row .meta span {
+      font-size: 11px;
+      color: var(--g-600);
+      background: var(--g-50);
+      padding: 2px 10px;
+      border-radius: 10px;
+      font-weight: 500;
+      border: 0.5px solid var(--g-100);
+    }
+    .ex-row .time {
+      font-size: 12px;
+      color: var(--text-ter);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── 入场动画增强 ── */
+    .page-header, .ex-row, .chart-box {
+      animation: fadeSlide 0.5s var(--ease-out) both;
+    }
+    .page-header { animation: fadeDown 0.5s var(--ease-out) both; }
+    .ex-row:nth-child(1) { animation-delay: 0.1s; }
+    .ex-row:nth-child(2) { animation-delay: 0.15s; }
+    .ex-row:nth-child(3) { animation-delay: 0.2s; }
+    .ex-row:nth-child(4) { animation-delay: 0.25s; }
+    .ex-row:nth-child(n+5) { animation-delay: 0.3s; }
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+<div class="navbar">
+  <a href="/history-category-complex" class="logo"><img src="/image.png" alt="">粉笔助手</a>
+  <a href="/history-category-complex">练习记录</a>
+  <a href="/history" class="active">列表视图</a>
+  <a href="/wrong-questions">错题本</a>
+  <a href="/word-frequency">词语统计</a>
+  <a href="/setup" style="margin-left:auto;">切换账号</a>
+</div>
+
+<div class="container list-view">
+  <% if (total == 0) { %><script>window.location='/setup'</script><% } %>
+
+  <div class="page-hero">
+    <div class="hero-title">列表视图</div>
+    <div class="hero-sub">按日期浏览全部练习</div>
+  </div>
+
+  <div class="stats-row" style="margin-bottom:24px;">
+    <div class="stat-card">
+      <div class="num"><%= total %></div>
+      <div class="lbl">次练习</div>
+    </div>
+  </div>
+
+  <% for (let dateKey of dateKeys) {
+    let items = grouped[dateKey];
+    let today = moment().format('YYYY-MM-DD');
+    let yesterday = moment().subtract(1, 'day').format('YYYY-MM-DD');
+    let displayDate;
+    if (dateKey === today) displayDate = '今天';
+    else if (dateKey === yesterday) displayDate = '昨天';
+    else displayDate = dateKey;
+  %>
+    <div class="date-group">
+      <div class="date-header">
+        <span class="date-text"><%= displayDate %></span>
+        <span class="date-count"><%= items.length %> 次练习</span>
+        <span class="deco-line"></span>
+      </div>
+
+      <% for (let h of items) {
+        var rateClass = h.correctRate >= 80 ? 'high' : h.correctRate >= 50 ? 'mid' : 'low';
+      %>
+        <div class="ex-row" onclick="showReport(<%= h.id %>)">
+          <span class="rate <%= rateClass %>"><%= h.correctRate %>%</span>
+          <div class="main">
+            <div class="title"><%= cleanTitle(h.sheet.name) %></div>
+            <div class="meta">
+              <span><%= h.answerCount %> 题</span>
+              <span><%= Math.round(moment.duration(h.elapsedTime,'seconds').asMinutes().toFixed(1)) %> 分钟</span>
+              <span><%= h.client==='WEB'||h.client==='APP_WEB'?'电脑端':'手机端' %></span>
+            </div>
+          </div>
+          <span class="time"><%= moment(h.updatedTime).format('HH:mm') %></span>
+        </div>
+      <% } %>
+    </div>
+  <% } %>
+
+  <div class="list-fade">- 已展示全部练习记录 -</div>
+</div>
+
+<script>
+// ── Scroll entrance animations ──
+(function(){
+  var els = document.querySelectorAll('.anim-in');
+  if(!els.length) return;
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){ e.target.classList.add('visible'); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+  els.forEach(function(el){ io.observe(el); });
+})();
+
+  function showReport(id) { window.location = '/exercise/'+id; }
+</script>
+</body>
+</html>

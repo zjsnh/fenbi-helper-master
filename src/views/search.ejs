@@ -1,0 +1,422 @@
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>搜索 · 粉笔助手</title>
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    body { background: var(--paper); }
+
+    /* ─ 搜索英雄区 ── */
+    .search-hero {
+      background:
+        radial-gradient(ellipse at 30% 0%, rgba(0,102,204,0.06) 0%, transparent 55%),
+        radial-gradient(ellipse at 70% 100%, rgba(90,155,230,0.04) 0%, transparent 55%),
+        linear-gradient(180deg, var(--paper-warm) 0%, var(--paper) 100%);
+      padding: 48px 0 36px;
+      margin: -40px -28px 28px;
+      padding-left: 28px;
+      padding-right: 28px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .search-hero::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 28px; right: 28px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--g-300), transparent);
+      opacity: 0.5;
+    }
+    .search-hero h1 {
+      font-size: 28px;
+      font-weight: 800;
+      font-family: var(--font-display);
+      color: var(--g-800);
+      margin-bottom: 6px;
+      letter-spacing: -0.5px;
+    }
+    .search-hero p {
+      font-size: 13px;
+      color: var(--ink-500);
+      margin-bottom: 24px;
+    }
+
+    /* ─ 模块选择器 ── */
+    .module-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 24px;
+      max-width: 680px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .module-chip {
+      padding: 7px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 20px;
+      border: 1.5px solid var(--border);
+      background: var(--card);
+      color: var(--ink-600);
+      cursor: pointer;
+      transition: all 0.25s var(--ease-out);
+      user-select: none;
+    }
+    .module-chip:hover {
+      border-color: var(--g-300);
+      background: var(--g-50);
+      color: var(--g-700);
+    }
+    .module-chip.active {
+      border-color: var(--g-500);
+      background: var(--g-500);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(0,102,204,0.25);
+    }
+
+    /* ── 搜索框 ── */
+    .search-box {
+      display: flex;
+      gap: 10px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .search-box .input {
+      flex: 1;
+      padding: 14px 20px;
+      font-size: 15px;
+      border-radius: var(--radius-lg);
+      border: 2px solid var(--border);
+      background: var(--card);
+      transition: all 0.3s var(--ease-out);
+      box-shadow: var(--shadow-sm);
+      outline: none;
+      font-family: inherit;
+    }
+    .search-box .input:focus {
+      border-color: var(--g-400);
+      box-shadow: 0 0 0 4px rgba(0,102,204,0.1), var(--shadow);
+      background: #fff;
+    }
+    .search-box .btn {
+      padding: 14px 28px;
+      font-size: 14px;
+      font-weight: 700;
+      border-radius: var(--radius-lg);
+      border: none;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--g-500), var(--g-600));
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(0,102,204,0.25);
+      transition: all 0.3s var(--ease-out);
+      font-family: inherit;
+    }
+    .search-box .btn:hover {
+      transform: none;
+      box-shadow: 0 4px 16px rgba(0,102,204,0.35);
+    }
+    .search-box .btn:active { transform: translateY(0) scale(0.97); }
+    .search-box .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+    .search-hint {
+      font-size: 11px;
+      color: var(--ink-400);
+      margin-top: 12px;
+    }
+
+    /* ── 搜索结果 ── */
+    .sr-card {
+      background: var(--card);
+      border: 0.5px solid var(--border-light);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: all 0.35s var(--ease-out);
+      position: relative;
+      overflow: hidden;
+      animation: cardSlide 0.4s var(--ease-out) both;
+    }
+    @keyframes cardSlide {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .sr-card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      background: linear-gradient(180deg, var(--g-300), var(--g-500));
+      transform: scaleY(0);
+      transform-origin: top;
+      transition: transform 0.3s var(--ease-out);
+    }
+    .sr-card:hover::before { transform: scaleY(1); }
+    .sr-card:hover {
+      box-shadow: var(--shadow);
+      border-color: var(--g-200);
+      transform: translateX(4px);
+    }
+    .sr-card .sr-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .sr-card .sr-tag {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 10px;
+      border-radius: 12px;
+      background: var(--g-50);
+      color: var(--g-600);
+      border: 0.5px solid var(--g-100);
+    }
+    .sr-card .sr-source {
+      font-size: 11px;
+      color: var(--ink-400);
+    }
+    .sr-card .sr-stem {
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.85;
+    }
+    .sr-card .sr-stem em {
+      color: var(--g-700);
+      font-style: normal;
+      font-weight: 700;
+      background: var(--g-50);
+      padding: 1px 6px;
+      border-radius: 3px;
+      border-bottom: 2px solid var(--g-300);
+    }
+
+    /* ── 结果统计 ── */
+    .sr-stats {
+      font-size: 12px;
+      color: var(--ink-400);
+      margin-bottom: 16px;
+      padding-left: 4px;
+    }
+    .sr-stats strong { color: var(--g-600); font-weight: 700; }
+
+    /* ── 空状态 ── */
+    .no-result {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-ter);
+      font-size: 14px;
+    }
+    .no-result .empty-icon {
+      font-size: 40px;
+      opacity: 0.3;
+      margin-bottom: 16px;
+    }
+
+    /* ── 加载 ─ */
+    .loading-wrap {
+      text-align: center;
+      padding: 60px;
+    }
+    .spinner {
+      display: inline-block;
+      width: 24px; height: 24px;
+      border: 3px solid var(--border-light);
+      border-top-color: var(--g-500);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── 入场动画增强 ── */
+    .search-hero {
+      animation: fadeDown 0.5s var(--ease-out) both;
+    }
+    .search-hero .hero-title {
+      animation: titleRise 0.6s var(--ease-spring) 0.08s both;
+    }
+    .search-box {
+      animation: fadeUp 0.4s var(--ease-out) 0.12s both;
+    }
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes titleRise {
+      from { opacity: 0; transform: translateY(16px) scale(0.95); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+<div class="navbar">
+  <a href="/history-category-complex" class="logo"><img src="/image.png" alt="">粉笔助手</a>
+  <a href="/history-category-complex">练习记录</a>
+  <a href="/history">列表视图</a>
+  <a href="/wrong-questions">错题本</a>
+  <a href="/search" target="_blank" class="active">搜索</a>
+  <a href="/setup" style="margin-left:auto;">切换账号</a>
+</div>
+
+<div class="container">
+  <div class="search-hero">
+    <h1>搜索题目</h1>
+    <p>选择模块，输入关键词，模糊匹配目标题目</p>
+
+    <!-- 模块选择器 -->
+    <div class="module-bar" id="moduleBar"></div>
+
+    <!-- 搜索框 -->
+    <div class="search-box">
+      <input class="input" id="searchContent" type="text" placeholder="输入关键字搜索题目..." autocomplete="off">
+      <button class="btn" id="searchBtn">搜索</button>
+    </div>
+    <div class="search-hint">按 Enter 快速搜索 · 支持模糊匹配</div>
+  </div>
+
+  <!-- 结果统计 -->
+  <div class="sr-stats" id="srStats" style="display:none;"></div>
+
+  <!-- 搜索结果区 -->
+  <div id="searchResult">
+    <div class="no-result">
+      <div class="empty-icon">&#x1F50D;</div>
+      选择模块，输入关键词开始搜索
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Scroll entrance animations ──
+  (function(){
+    var els = document.querySelectorAll('.anim-in');
+    if(!els.length) return;
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){ e.target.classList.add('visible'); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+    els.forEach(function(el){ io.observe(el); });
+  })();
+
+  var MODULES = <%- modules %>;
+  var currentModule = '全部';
+  var isSearching = false;
+
+  // ── 渲染模块选择器 ──
+  function renderModules() {
+    var bar = document.getElementById('moduleBar');
+    var html = '';
+    MODULES.forEach(function(m) {
+      html += '<span class="module-chip' + (m === currentModule ? ' active' : '') + '" data-module="' + m + '" onclick="selectModule(\'' + m.replace(/'/g, "\\'") + '\')">' + m + '</span>';
+    });
+    bar.innerHTML = html;
+  }
+
+  function selectModule(name) {
+    currentModule = name;
+    renderModules();
+  }
+
+  renderModules();
+
+  // ── 搜索逻辑 ──
+  document.getElementById('searchContent').addEventListener('keydown', function(e) {
+    if (e.keyCode === 13) doSearch();
+  });
+  document.getElementById('searchBtn').addEventListener('click', doSearch);
+
+  function doSearch() {
+    if (isSearching) return;
+    var text = document.getElementById('searchContent').value.trim();
+    if (!text.length) return;
+
+    var r = document.getElementById('searchResult');
+    var stats = document.getElementById('srStats');
+    r.innerHTML = '<div class="loading-wrap"><span class="spinner"></span></div>';
+    stats.style.display = 'none';
+    isSearching = true;
+
+    var btn = document.getElementById('searchBtn');
+    btn.disabled = true;
+    btn.textContent = '搜索中...';
+
+    fetch('/api/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text, module: currentModule })
+    })
+    .then(function(res) {
+      if (res.status === 200) return res.json();
+      throw new Error('搜索失败');
+    })
+    .then(function(datas) {
+      r.innerHTML = '';
+
+      if (!datas || !datas.length) {
+        r.innerHTML = '<div class="no-result"><div class="empty-icon">&#x1F50E;</div>未找到相关题目，请尝试其他关键词</div>';
+        return;
+      }
+
+      // 显示统计
+      stats.style.display = 'block';
+      var moduleLabel = currentModule === '全部' ? '全部模块' : currentModule;
+      stats.innerHTML = '在 <strong>' + moduleLabel + '</strong> 中找到 <strong>' + datas.length + '</strong> 道匹配题目';
+
+      datas.forEach(function(data, idx) {
+        var card = document.createElement('div');
+        card.className = 'sr-card';
+        card.style.animationDelay = (idx * 0.04) + 's';
+        card.onclick = function() {
+          window.open('/question/' + data.questionId, '_blank');
+        };
+
+        // 元信息行：模块标签 + 来源
+        var meta = document.createElement('div');
+        meta.className = 'sr-meta';
+        if (data.sourceList && data.sourceList.length > 0) {
+          // 第一个来源作为模块标签
+          var tag = document.createElement('span');
+          tag.className = 'sr-tag';
+          tag.textContent = data.sourceList[0];
+          meta.appendChild(tag);
+          // 其余来源
+          if (data.sourceList.length > 1) {
+            var src = document.createElement('span');
+            src.className = 'sr-source';
+            src.textContent = data.sourceList.slice(1).join(' / ');
+            meta.appendChild(src);
+          }
+        }
+        card.appendChild(meta);
+
+        // 题干
+        var stem = document.createElement('div');
+        stem.className = 'sr-stem';
+        stem.innerHTML = data.stemSnippet_ || '';
+        card.appendChild(stem);
+
+        r.appendChild(card);
+      });
+    })
+    .catch(function(err) {
+      r.innerHTML = '<div class="no-result" style="color:var(--danger);">搜索失败：' + err.message + '</div>';
+    })
+    .finally(function() {
+      isSearching = false;
+      btn.disabled = false;
+      btn.textContent = '搜索';
+    });
+  }
+</script>
+</body>
+</html>

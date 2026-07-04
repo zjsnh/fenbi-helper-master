@@ -1,0 +1,646 @@
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>词语统计</title>
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    body { background: var(--paper); }
+
+    /* ── Hero 区 — 带微光动效 ── */
+    .page-hero {
+      background:
+        radial-gradient(ellipse at 20% 0%, rgba(0,102,204,0.05) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 100%, rgba(90,155,230,0.03) 0%, transparent 50%);
+      padding: 20px 0 8px;
+      margin: -32px -24px 20px;
+      padding-left: 24px;
+      padding-right: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+    .page-hero::before {
+      content: '';
+      position: absolute;
+      top: -30%;
+      right: -15%;
+      width: 80%;
+      height: 160%;
+      background: radial-gradient(circle at 50% 50%, rgba(0,102,204,0.03) 0%, transparent 40%);
+      animation: heroDrift 12s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes heroDrift {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(-15px, 15px); }
+    }
+    .hero-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-900);
+      letter-spacing: -0.3px;
+      animation: titleRise 0.6s var(--ease-spring) both;
+      position: relative;
+      z-index: 1;
+    }
+    .hero-sub {
+      font-size: 13px;
+      color: var(--text-500);
+      margin-top: 4px;
+      animation: fadeUp 0.5s var(--ease-out) 0.08s both;
+      position: relative;
+      z-index: 1;
+    }
+    @keyframes titleRise {
+      from { opacity: 0; transform: translateY(16px) scale(0.96); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* ── 统计栏 ── */
+    .stats-bar {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+    .stats-bar-item {
+      background: var(--card);
+      border: 0.5px solid var(--border-light);
+      border-radius: 10px;
+      padding: 12px 20px;
+      font-size: 13px;
+      color: var(--text-sec);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.25s var(--ease-out), transform 0.25s var(--ease-out);
+    }
+    .stats-bar-item.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .stats-bar-item b {
+      color: #0a1628;
+      font-weight: 700;
+      font-size: 16px;
+    }
+
+    /* ── 分类卡片网格 ── */
+    .cat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    .cat-card {
+      background: var(--card);
+      border: 0.5px solid var(--border-light);
+      border-radius: 14px;
+      padding: 24px;
+      cursor: pointer;
+      transition: all 0.3s var(--ease-out);
+      position: relative;
+      overflow: hidden;
+      opacity: 0;
+      transform: translateY(20px) scale(0.97);
+    }
+    .cat-card.visible {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      transition: opacity 0.5s var(--ease-out), transform 0.5s var(--ease-spring),
+                  border-color 0.3s var(--ease-out), box-shadow 0.3s var(--ease-out);
+    }
+    .cat-card:hover {
+      border-color: var(--g-300);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    }
+    .cat-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--g-400), var(--g-600));
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.5s var(--ease-out) 0.2s;
+    }
+    .cat-card.visible::before {
+      transform: scaleX(1);
+    }
+    .cat-card.idiom::before {
+      background: linear-gradient(90deg, #f39c12, #e67e22);
+    }
+    .cat-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: #0a1628;
+      font-family: var(--font-display);
+      margin-bottom: 8px;
+    }
+    .cat-count {
+      font-size: 36px;
+      font-weight: 800;
+      color: var(--g-600);
+      margin-bottom: 4px;
+      font-family: var(--font-mono);
+      letter-spacing: -1px;
+    }
+    .cat-card.idiom .cat-count {
+      color: #e67e22;
+    }
+    .cat-count.counting {
+      animation: countPulse 0.5s var(--ease-spring);
+    }
+    @keyframes countPulse {
+      0%   { transform: scale(1); }
+      40%  { transform: scale(1.15); }
+      100% { transform: scale(1); }
+    }
+    .cat-sub {
+      font-size: 13px;
+      color: var(--text-ter);
+    }
+
+    /* ── 词语列表页 ── */
+    .word-list-page { display: none; }
+    .word-list-page.show { display: block; animation: pageSlideIn 0.4s var(--ease-out); }
+    .category-page.hide { display: none; }
+    @keyframes pageSlideIn {
+      from { opacity: 0; transform: translateX(20px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      background: var(--card);
+      border: 0.5px solid var(--border-light);
+      border-radius: 980px;
+      font-size: 13px;
+      color: var(--text-sec);
+      cursor: pointer;
+      transition: all 0.25s var(--ease-out);
+      margin-bottom: 20px;
+      animation: fadeUp 0.4s var(--ease-out) both;
+    }
+    .back-btn:hover {
+      border-color: var(--g-300);
+      color: #0a1628;
+      background: var(--brand-50);
+    }
+
+    .list-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-900);
+      margin-bottom: 20px;
+      font-family: var(--font-display);
+      animation: fadeUp 0.4s var(--ease-out) 0.06s both;
+    }
+
+    .word-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 10px;
+    }
+    .word-card {
+      background: var(--card);
+      border: 0.5px solid var(--border-light);
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: border-color 0.25s, box-shadow 0.25s;
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    .word-card.visible {
+      opacity: 1;
+      transform: translateY(0);
+      transition: opacity 0.35s var(--ease-out), transform 0.35s var(--ease-out),
+                  border-color 0.25s, box-shadow 0.25s;
+    }
+    .word-card:hover {
+      border-color: var(--g-300);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .word-card .word-text {
+      font-size: 15px;
+      font-weight: 700;
+      color: #0a1628;
+      font-family: var(--font-display);
+    }
+    .word-card .word-count {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 12px;
+      white-space: nowrap;
+    }
+    .word-count-high { background: #fef0ee; color: #c0392b; }
+    .word-count-mid { background: #fef9ee; color: #b8860b; }
+    .word-count-low { background: #dce8f5; color: #1a5a3a; }
+
+    /* ── 题目详情面板 ── */
+    .question-panel {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 1000;
+      overflow-y: auto;
+      padding: 40px 20px;
+      animation: overlayFadeIn 0.25s var(--ease-out);
+    }
+    .question-panel.show { display: block; }
+    @keyframes overlayFadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    .question-panel-inner {
+      max-width: 720px;
+      margin: 0 auto;
+      background: var(--card);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+      max-height: 80vh;
+      overflow-y: auto;
+      animation: panelPop 0.35s var(--ease-spring);
+    }
+    @keyframes panelPop {
+      from { opacity: 0; transform: scale(0.95) translateY(12px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .question-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 0.5px solid var(--border-light);
+      position: sticky;
+      top: 0;
+      background: var(--card);
+      z-index: 1;
+    }
+    .question-panel-header h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 700;
+      color: #0a1628;
+    }
+    .question-panel-header .close-btn {
+      font-size: 20px;
+      cursor: pointer;
+      color: var(--text-ter);
+      background: none;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+    .question-panel-header .close-btn:hover { background: var(--g-50); color: var(--text-900); }
+
+    .question-item {
+      padding: 16px 0;
+      border-bottom: 0.5px solid #eaf1fb;
+      animation: fadeUp 0.35s var(--ease-out) both;
+    }
+    .question-item:last-child { border-bottom: none; }
+    .question-item .q-source {
+      font-size: 12px;
+      color: var(--text-ter);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .question-item .q-source .q-num {
+      background: var(--g-100);
+      color: var(--g-700);
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+    }
+    .question-item .q-content {
+      font-size: 14px;
+      line-height: 1.8;
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+    .question-item .q-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 16px;
+      font-size: 13px;
+      color: var(--text-sec);
+      margin-bottom: 10px;
+    }
+    .question-item .q-options div {
+      padding: 6px 10px;
+      background: #f8faff;
+      border-radius: 6px;
+      border: 0.5px solid #edf2fa;
+    }
+    .question-item .q-options div.correct-opt {
+      background: #f0f7e8;
+      border-color: var(--brand-600);
+      color: #2d6a1e;
+      font-weight: 600;
+    }
+    .question-item .q-solution {
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text-sec);
+      background: #f5f9ff;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border-left: 3px solid #0066cc;
+    }
+    .question-item .q-solution-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--g-700);
+      margin-bottom: 6px;
+    }
+    .question-loading {
+      text-align: center;
+      padding: 20px;
+      color: var(--text-ter);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-ter);
+      animation: fadeUp 0.5s var(--ease-out);
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 12px; opacity: 0.3; }
+    .empty-state p { font-size: 14px; }
+
+    .loading {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-sec);
+    }
+    .loading .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--border-light);
+      border-top-color: var(--brand-500);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+<div class="navbar">
+  <a href="/history-category-complex" class="logo"><img src="/image.png" alt="">粉笔助手</a>
+  <a href="/history-category-complex">练习记录</a>
+  <a href="/history">列表视图</a>
+  <a href="/wrong-questions">错题本</a>
+  <a href="/word-frequency" class="active">词语统计</a>
+  <a href="/setup" style="margin-left:auto;">切换账号</a>
+</div>
+
+<div class="container-wide">
+  <!-- 分类页面 -->
+  <div class="category-page" id="categoryPage">
+    <div class="page-hero">
+      <div class="hero-title">词语统计</div>
+      <div class="hero-sub">从错题本逻辑填空题中提取高频词语和成语</div>
+    </div>
+
+    <div class="stats-bar">
+      <div class="stats-bar-item">四字成语：<b id="idiomCount">-</b></div>
+      <div class="stats-bar-item">高频词语：<b id="wordCount">-</b></div>
+      <div class="stats-bar-item">更新时间：<b id="updateTime">-</b></div>
+    </div>
+
+    <div class="cat-grid">
+      <div class="cat-card idiom" onclick="showWordList('idiom')">
+        <div class="cat-name">四字成语</div>
+        <div class="cat-count" id="idiomTotal">-</div>
+        <div class="cat-sub">全部统计，不限次数</div>
+      </div>
+      <div class="cat-card" onclick="showWordList('word')">
+        <div class="cat-name">高频词语</div>
+        <div class="cat-count" id="wordTotal">-</div>
+        <div class="cat-sub">出现次数 &gt; 3 次</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 词语列表页面 -->
+  <div class="word-list-page" id="wordListPage">
+    <button class="back-btn" onclick="backToCategory()">&#x2190; 返回分类</button>
+    <h2 id="listTitle" style="font-size:20px;font-weight:700;color:var(--text-900);margin-bottom:20px;font-family:var(--font-display);"></h2>
+    <div id="wordListContent">
+      <div class="loading">
+        <div class="spinner"></div>
+        <p>加载中...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 题目详情弹窗 -->
+<div class="question-panel" id="questionPanel">
+  <div class="question-panel-inner">
+    <div class="question-panel-header">
+      <h3 id="panelTitle">题目列表</h3>
+      <button class="close-btn" onclick="closePanel()">&#x2715;</button>
+    </div>
+    <div id="panelContent">
+      <div class="question-loading">加载中...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── 动画引擎 ──
+  (function(){
+    function reveal(selector, delay, stagger) {
+      var els = document.querySelectorAll(selector);
+      els.forEach(function(el, i){
+        var d = delay + (stagger || 0) * i;
+        setTimeout(function(){ el.classList.add('visible'); }, d);
+      });
+    }
+    // 初始页面元素
+    setTimeout(function(){ reveal('.stats-bar-item', 100, 80); }, 200);
+    setTimeout(function(){ reveal('.cat-card', 300, 120); }, 100);
+
+    // 暴露到全局供动态内容调用 — 批量快速显示
+    window._revealCards = function(selector) {
+      var els = document.querySelectorAll(selector);
+      if(!els.length) return;
+      var batchSize = Math.max(20, Math.ceil(els.length / 3));
+      for(var b = 0; b < els.length; b += batchSize) {
+        (function(batch, delay){
+          setTimeout(function(){
+            for(var i = batch; i < Math.min(batch + batchSize, els.length); i++){
+              els[i].classList.add('visible');
+            }
+          }, delay);
+        })(b, 80 + (b / batchSize) * 100);
+      }
+    };
+    window._revealStats = function(selector) {
+      var els = document.querySelectorAll(selector);
+      setTimeout(function(){
+        els.forEach(function(el){ el.classList.add('visible'); });
+      }, 100);
+    };
+  })();
+
+  var allWords = [];
+  var allIdioms = [];
+  var currentType = null;
+
+  fetch('/api/word-frequency')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(data) {
+      if (!data) {
+        document.getElementById('categoryPage').innerHTML =
+          '<div class="empty-state"><div class="icon">&#x26A0;</div><p>加载失败</p></div>';
+        return;
+      }
+
+      allWords = data.words || [];
+      allIdioms = data.idioms || [];
+
+      document.getElementById('idiomCount').textContent = allIdioms.length;
+      document.getElementById('wordCount').textContent = allWords.length;
+      document.getElementById('idiomTotal').textContent = allIdioms.length;
+      document.getElementById('wordTotal').textContent = allWords.length;
+      if (data.cachedAt) {
+        document.getElementById('updateTime').textContent = new Date(data.cachedAt).toLocaleString('zh-CN');
+      }
+
+      window._revealStats('.stats-bar-item', 100, 80);
+    })
+    .catch(function(e) {
+      document.getElementById('categoryPage').innerHTML =
+        '<div class="empty-state"><div class="icon">&#x26A0;</div><p>加载失败：' + e.message + '</p></div>';
+    });
+
+  function showWordList(type) {
+    currentType = type;
+    document.getElementById('categoryPage').classList.add('hide');
+    document.getElementById('wordListPage').classList.add('show');
+
+    var list = type === 'idiom' ? allIdioms : allWords;
+    var title = type === 'idiom' ? '四字成语' : '高频词语';
+    document.getElementById('listTitle').textContent = title + '（' + list.length + '个）';
+
+    if (list.length === 0) {
+      document.getElementById('wordListContent').innerHTML =
+        '<div class="empty-state"><div class="icon">&#x1F4DD;</div><p>暂无数据</p></div>';
+      return;
+    }
+
+    var html = '<div class="word-grid">';
+    list.forEach(function(item) {
+      var countClass = item.count >= 10 ? 'word-count-high' : item.count >= 6 ? 'word-count-mid' : 'word-count-low';
+      html += '<div class="word-card" onclick="showWordQuestions(\'' + item.word.replace(/'/g, "\\'") + '\')">';
+      html += '<span class="word-text">' + item.word + '</span>';
+      html += '<span class="word-count ' + countClass + '">' + item.count + '次</span>';
+      html += '</div>';
+    });
+    html += '</div>';
+
+    document.getElementById('wordListContent').innerHTML = html;
+    window._revealCards('.word-card');
+  }
+
+  function backToCategory() {
+    document.getElementById('categoryPage').classList.remove('hide');
+    document.getElementById('wordListPage').classList.remove('show');
+    currentType = null;
+  }
+
+  function showWordQuestions(word) {
+    var list = currentType === 'idiom' ? allIdioms : allWords;
+    var item = list.find(function(w) { return w.word === word; });
+    if (!item) return;
+
+    document.getElementById('panelTitle').textContent = '「' + word + '」相关错题（' + item.questionIds.length + '题）';
+    document.getElementById('panelContent').innerHTML = '<div class="question-loading">加载中...</div>';
+    document.getElementById('questionPanel').classList.add('show');
+
+    fetch('/api/wrong-questions-by-ids', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: item.questionIds })
+    })
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(questions) {
+      if (!questions || questions.length === 0) {
+        document.getElementById('panelContent').innerHTML = '<div class="question-loading">暂无题目数据</div>';
+        return;
+      }
+
+      var html = '';
+      questions.forEach(function(q, idx) {
+        html += '<div class="question-item">';
+        html += '<div class="q-source"><span class="q-num">第' + (idx+1) + '题</span>' + (q.source || '未知来源') + '</div>';
+        html += '<div class="q-content">' + (q.content || '') + '</div>';
+        if (q.options && q.options.length > 0) {
+          html += '<div class="q-options">';
+          q.options.forEach(function(opt, oi) {
+            var cleanOpt = opt.replace(/<[^>]+>/g, '').trim();
+            var correctAns = q.correctAnswer;
+            if (correctAns && typeof correctAns === 'object') correctAns = correctAns.choice;
+            if (correctAns === '0') correctAns = 'A';
+            else if (correctAns === '1') correctAns = 'B';
+            else if (correctAns === '2') correctAns = 'C';
+            else if (correctAns === '3') correctAns = 'D';
+            var isCorrect = ['A','B','C','D'][oi] === correctAns;
+            html += '<div class="' + (isCorrect ? 'correct-opt' : '') + '">' + ['A','B','C','D'][oi] + '. ' + cleanOpt + '</div>';
+          });
+          html += '</div>';
+        }
+        if (q.solution) {
+          html += '<div class="q-solution">';
+          html += '<div class="q-solution-title">解析</div>';
+          html += '<div>' + q.solution.replace(/<[^>]+>/g, '') + '</div>';
+          html += '</div>';
+        } else {
+          html += '<div class="q-solution" style="color:#999;border-left-color:#ccc;">暂无解析</div>';
+        }
+        html += '</div>';
+      });
+
+      document.getElementById('panelContent').innerHTML = html;
+      document.querySelectorAll('.question-item').forEach(function(el, i){
+        el.style.animationDelay = (i * 0.06) + 's';
+      });
+    })
+    .catch(function(e) {
+      document.getElementById('panelContent').innerHTML = '<div class="question-loading">加载失败：' + e.message + '</div>';
+    });
+  }
+
+  function closePanel() {
+    document.getElementById('questionPanel').classList.remove('show');
+  }
+
+  document.getElementById('questionPanel').addEventListener('click', function(e) {
+    if (e.target === this) closePanel();
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,202 @@
+{
+  "data": [
+    {
+      "id": "page-login",
+      "title": "登录",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1751598000000,
+      "canvasData": {
+        "x": 0,
+        "y": 0,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/login.html",
+        "interactions": [
+          {
+            "domId": "cta-login",
+            "targetPageId": "page-history",
+            "transitionLabel": "登录成功"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-history",
+      "title": "练习历史",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1751598001000,
+      "canvasData": {
+        "x": 480,
+        "y": 0,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/history.html",
+        "interactions": [
+          {
+            "domId": "cta-question",
+            "targetPageId": "page-question",
+            "transitionLabel": "查看练习"
+          },
+          {
+            "domId": "nav-wrong",
+            "targetPageId": "page-wrong-questions",
+            "transitionLabel": "错题本"
+          },
+          {
+            "domId": "nav-search",
+            "targetPageId": "page-search",
+            "transitionLabel": "搜索"
+          },
+          {
+            "domId": "nav-login",
+            "targetPageId": "page-login",
+            "hideEdge": true,
+            "transitionLabel": "退出登录"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-question",
+      "title": "题目详情",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1751598002000,
+      "canvasData": {
+        "x": 1440,
+        "y": 0,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/question.html",
+        "interactions": [
+          {
+            "domId": "nav-back",
+            "targetPageId": "page-history",
+            "hideEdge": true,
+            "transitionLabel": "返回"
+          },
+          {
+            "domId": "nav-home",
+            "targetPageId": "page-history",
+            "hideEdge": true,
+            "transitionLabel": "首页"
+          },
+          {
+            "domId": "nav-wrong",
+            "targetPageId": "page-wrong-questions",
+            "hideEdge": true,
+            "transitionLabel": "错题本"
+          },
+          {
+            "domId": "nav-search",
+            "targetPageId": "page-search",
+            "hideEdge": true,
+            "transitionLabel": "搜索"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-wrong-questions",
+      "title": "错题本",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1751598003000,
+      "canvasData": {
+        "x": 960,
+        "y": 0,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/wrong-questions.html",
+        "interactions": [
+          {
+            "domId": "cta-wrong-detail",
+            "targetPageId": "page-question",
+            "transitionLabel": "查看错题"
+          },
+          {
+            "domId": "nav-home",
+            "targetPageId": "page-history",
+            "hideEdge": true,
+            "transitionLabel": "首页"
+          },
+          {
+            "domId": "nav-search",
+            "targetPageId": "page-search",
+            "hideEdge": true,
+            "transitionLabel": "搜索"
+          },
+          {
+            "domId": "nav-back",
+            "targetPageId": "page-history",
+            "hideEdge": true,
+            "transitionLabel": "返回"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-search",
+      "title": "搜索",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1751598004000,
+      "canvasData": {
+        "x": 960,
+        "y": 488,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/search.html",
+        "interactions": [
+          {
+            "domId": "cta-result",
+            "targetPageId": "page-question",
+            "transitionLabel": "查看题目"
+          },
+          {
+            "domId": "nav-home",
+            "targetPageId": "page-history",
+            "hideEdge": true,
+            "transitionLabel": "首页"
+          },
+          {
+            "domId": "nav-wrong",
+            "targetPageId": "page-wrong-questions",
+            "hideEdge": true,
+            "transitionLabel": "错题本"
+          },
+          {
+            "domId": "nav-back",
+            "targetPageId": "page-history",
+            "hideEdge": true,
+            "transitionLabel": "返回"
+          }
+        ]
+      }
+    }
+  ],
+  "config": {
+    "autoLayout": true,
+    "deviceType": "tablet",
+    "projectName": "粉笔刷题助手",
+    "designLibrary": {
+      "name": "苹果",
+      "id": "dl_builtin_apple",
+      "version": 1,
+      "scope": "built-in-global",
+      "path": "c:\\Users\\30780\\.trae-cn\\design_libraries\\dl_builtin_apple",
+      "versionSource": "metadata.json"
+    },
+    "windowSize": {
+      "width": 800,
+      "height": 600
+    }
+  }
+}

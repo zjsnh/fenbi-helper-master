@@ -1,0 +1,474 @@
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>练习记录 · 粉笔助手</title>
+  <link rel="stylesheet" href="/theme.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/cal-heatmap/3.3.10/cal-heatmap.css" />
+  <style>
+    body { background: var(--paper); }
+
+    /* 热力图容器 */
+    #cal-heatmap { margin: 0 0 28px; }
+
+    /* 分类区块 — 折叠手风琴 */
+    .cat-section {
+      margin-bottom: 20px;
+      animation: fadeUp 0.5s var(--ease-decel) both;
+    }
+    .cat-section:nth-child(2) { animation-delay: 0.08s; }
+    .cat-section:nth-child(3) { animation-delay: 0.16s; }
+    .cat-section:nth-child(4) { animation-delay: 0.24s; }
+    .cat-section:nth-child(5) { animation-delay: 0.32s; }
+
+    .cat-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      background: var(--card);
+      border: 0.5px solid var(--border-light);
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: all 0.35s var(--ease);
+      box-shadow: var(--shadow-xs);
+      position: relative;
+      overflow: hidden;
+      user-select: none;
+    }
+    .cat-header::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: linear-gradient(180deg, var(--g-300), var(--g-500));
+      opacity: 0;
+      transition: opacity 0.3s var(--ease);
+    }
+    .cat-header:hover::before { opacity: 1; }
+    .cat-header:hover {
+      border-color: var(--g-200);
+      box-shadow: var(--shadow);
+      transform: none;
+    }
+    .cat-header.open {
+      border-radius: var(--radius) var(--radius) 0 0;
+      border-color: var(--g-200);
+      background: var(--g-50);
+    }
+    .cat-header.open::before { opacity: 1; }
+    .cat-header .cat-name {
+      font-size: 15px;
+      font-weight: 700;
+      font-family: var(--font-display);
+      color: var(--g-700);
+    }
+    .cat-header .cat-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .cat-header .cnt {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--g-600);
+      background: var(--g-50);
+      padding: 3px 12px;
+      border-radius: 12px;
+      border: 0.5px solid var(--g-200);
+    }
+    .cat-header .arrow {
+      font-size: 10px;
+      color: var(--ink-400);
+      transition: transform 0.35s var(--ease);
+    }
+    .cat-header.open .arrow { transform: rotate(180deg); }
+
+    /* 展开内容 */
+    .cat-body {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.45s var(--ease);
+      border: 1px solid transparent;
+      border-top: none;
+      border-radius: 0 0 var(--radius) var(--radius);
+      background: var(--paper);
+    }
+    .cat-body.open {
+      max-height: 5000px;
+      border-color: var(--border-light);
+    }
+    .cat-body-inner { padding: 8px 16px 16px; }
+
+    /* 子分类标题 */
+    .sub-cat-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink-700);
+      margin: 14px 0 8px 12px;
+      padding-left: 10px;
+      border-left: 2px solid var(--g-300);
+      line-height: 1;
+    }
+    .sub-cat-title-sm {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--ink-500);
+      margin: 10px 0 6px 28px;
+      padding-left: 8px;
+      border-left: 2px solid var(--ink-300);
+      line-height: 1;
+    }
+
+    /* 练习记录行 — 墨迹条 */
+    .ex-item-list { padding-left: 8px; }
+    .ex-row {
+      display: flex;
+      align-items: center;
+      padding: 10px 16px;
+      margin: 0 0 4px 0;
+      background: var(--card);
+      border: 0.5px solid var(--border-light);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.3s var(--ease);
+      gap: 12px;
+      position: relative;
+      overflow: hidden;
+    }
+    .ex-row::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: var(--g-400);
+      transform: scaleY(0);
+      transition: transform 0.3s var(--ease);
+    }
+    .ex-row:hover::after { transform: scaleY(1); }
+    .ex-row:hover {
+      box-shadow: var(--shadow-sm);
+      border-color: var(--g-200);
+      transform: translateX(4px);
+    }
+    .ex-row.highlight {
+      background: var(--g-50);
+      border-color: var(--g-300);
+    }
+    .ex-row.highlight::after { transform: scaleY(1); }
+    .ex-row .rate {
+      font-size: 18px;
+      font-weight: 800;
+      font-family: var(--font-display);
+      color: var(--g-600);
+      flex-shrink: 0;
+      min-width: 48px;
+      text-align: center;
+      letter-spacing: -1px;
+    }
+    .ex-row .title {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      min-width: 0;
+    }
+    .ex-row .meta {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 8px;
+      background: var(--g-50);
+      color: var(--g-600);
+      white-space: nowrap;
+      border: 0.5px solid var(--g-100);
+    }
+    .ex-row .date {
+      font-size: 11px;
+      color: var(--text-ter);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .empty-hint {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-ter);
+      font-size: 14px;
+    }
+
+    /* 热力图样式覆盖 */
+    .cal-heatmap-container {
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+      scrollbar-color: var(--g-200) transparent;
+    }
+    .cal-heatmap-container::-webkit-scrollbar { height: 6px; }
+    .cal-heatmap-container::-webkit-scrollbar-track { background: transparent; }
+    .cal-heatmap-container::-webkit-scrollbar-thumb {
+      background: var(--g-200);
+      border-radius: 3px;
+    }
+    .graph-domain { margin-bottom: 4px !important; }
+
+    /* ── 入场动画增强 ── */
+    #cal-heatmap {
+      animation: fadeUp 0.6s var(--ease-out) both;
+    }
+    .cat-section {
+      animation: fadeUp 0.5s var(--ease-decel) both;
+    }
+    .cat-section:nth-child(1) { animation-delay: 0.1s; }
+    .cat-section:nth-child(2) { animation-delay: 0.18s; }
+    .cat-section:nth-child(3) { animation-delay: 0.26s; }
+    .cat-section:nth-child(4) { animation-delay: 0.34s; }
+    .cat-section:nth-child(5) { animation-delay: 0.42s; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+  </style>
+  <script src="/d3.min.js"></script>
+  <script src="//cdn.jsdelivr.net/cal-heatmap/3.3.10/cal-heatmap.min.js"></script>
+</head>
+<body>
+
+<div class="navbar">
+  <a href="/history-category-complex" class="logo"><img src="/image.png" alt="">粉笔助手</a>
+  <a href="/history-category-complex" class="active">练习记录</a>
+  <a href="/history">列表视图</a>
+  <a href="/wrong-questions">错题本</a>
+  <a href="/word-frequency">词语统计</a>
+  <a href="/setup" style="margin-left:auto;">切换账号</a>
+</div>
+
+<div class="container-wide">
+  <% if (exerciseHistory.length == 0) { %><script>window.location='/setup'</script><% } %>
+
+  <!-- 页面头部 -->
+  <div class="page-hero" style="display:flex;align-items:center;justify-content:space-between;">
+    <div>
+      <div class="hero-title">练习记录</div>
+      <div class="hero-sub">
+        回顾每一次练习，追踪进步轨迹
+        <span id="cacheHint" style="font-size:11px;color:var(--ink-400);margin-left:8px;"></span>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span id="cacheTime" style="font-size:11px;color:var(--ink-400);"></span>
+      <button id="refreshBtn" onclick="refreshData()" style="
+        padding: 8px 20px;
+        border: 1px solid var(--g-300);
+        border-radius: var(--radius-sm);
+        background: var(--card);
+        color: var(--g-700);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      ">
+        <svg id="refreshIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/></svg>
+        刷新数据
+      </button>
+    </div>
+  </div>
+
+  <!-- 统计卡片 -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="num"><%= groupItems.map(function(i){return i.count;}).reduce(function(a,b){return a+b;},0) %></div>
+      <div class="lbl">练习总题数</div>
+    </div>
+    <div class="stat-card">
+      <div class="num"><%= exerciseHistory.length %></div>
+      <div class="lbl">练习次数</div>
+    </div>
+  </div>
+
+  <!-- 热力图 -->
+  <div class="card" style="margin-bottom:28px; padding:20px;">
+    <div id="cal-heatmap"></div>
+  </div>
+
+  <!-- 分类练习记录：手风琴式 -->
+  <% for (let c1 of groupItems) { %>
+    <% if (c1.count > 0) { %>
+    <div class="cat-section">
+      <div class="cat-header" onclick="toggleSection(this)">
+        <span class="cat-name"><%= c1.type %></span>
+        <div class="cat-meta">
+          <span class="cnt"><%= c1.count %> 题</span>
+          <span class="arrow">&#x25BC;</span>
+        </div>
+      </div>
+      <div class="cat-body">
+        <div class="cat-body-inner">
+          <!-- 一级练习项 -->
+          <% if (c1.items && c1.items.length > 0) { %>
+          <div class="ex-item-list">
+            <% for (let item of c1.items) { %>
+            <div class="ex-row" id="his-<%= item.id %>" onclick="showReport(<%= item.id %>)">
+              <span class="rate"><%= item.correctRate %>%</span>
+              <span class="title" title="<%= item.cleanName %>"><%= item.cleanName %></span>
+              <span class="meta"><%= item.answerCount %>题</span>
+              <span class="date"><%= item.finishedDate %></span>
+            </div>
+            <% } %>
+          </div>
+          <% } %>
+
+          <!-- 二级子分类 -->
+          <% for (let c2 of c1.childTypes) { %>
+            <% if (c2.count > 0) { %>
+            <div class="sub-cat-title"><%= c2.type %></div>
+              <% if (c2.items && c2.items.length > 0) { %>
+              <div class="ex-item-list">
+                <% for (let item of c2.items) { %>
+                <div class="ex-row" id="his-<%= item.id %>" onclick="showReport(<%= item.id %>)">
+                  <span class="rate"><%= item.correctRate %>%</span>
+                  <span class="title" title="<%= item.cleanName %>"><%= item.cleanName %></span>
+                  <span class="meta"><%= item.answerCount %>题</span>
+                  <span class="date"><%= item.finishedDate %></span>
+                </div>
+                <% } %>
+              </div>
+              <% } %>
+
+              <!-- 三级子分类 -->
+              <% for (let c3 of c2.childTypes) { %>
+                <% if (c3.count > 0) { %>
+                <div class="sub-cat-title-sm"><%= c3.type %></div>
+                  <% if (c3.items && c3.items.length > 0) { %>
+                  <div class="ex-item-list">
+                    <% for (let item of c3.items) { %>
+                    <div class="ex-row" id="his-<%= item.id %>" onclick="showReport(<%= item.id %>)">
+                      <span class="rate"><%= item.correctRate %>%</span>
+                      <span class="title" title="<%= item.cleanName %>"><%= item.cleanName %></span>
+                      <span class="meta"><%= item.answerCount %>题</span>
+                      <span class="date"><%= item.finishedDate %></span>
+                    </div>
+                    <% } %>
+                  </div>
+                  <% } %>
+                <% } %>
+              <% } %>
+            <% } %>
+          <% } %>
+        </div>
+      </div>
+    </div>
+    <% } %>
+  <% } %>
+
+  <% if (groupItems.every(function(c){ return c.count === 0; })) { %>
+    <div class="empty-hint">暂无练习记录</div>
+  <% } %>
+</div>
+
+<script>
+  /* 显示缓存状态 */
+  (function() {
+    var fromCache = <%= typeof _fromCache !== 'undefined' ? _fromCache : 'false' %>;
+    var cachedAt = <%= typeof _cachedAt !== 'undefined' && _cachedAt ? _cachedAt : '0' %>;
+    var cacheTimeEl = document.getElementById('cacheTime');
+    var cacheHintEl = document.getElementById('cacheHint');
+    if (fromCache && cachedAt) {
+      var d = new Date(cachedAt);
+      var timeStr = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+      cacheHintEl.textContent = '(本地缓存)';
+      cacheTimeEl.textContent = '更新于 ' + timeStr;
+    } else if (fromCache) {
+      cacheHintEl.textContent = '(本地缓存)';
+    } else {
+      cacheHintEl.textContent = '(最新数据)';
+    }
+  })();
+
+  /* 刷新数据：强制从API重新获取 */
+  function refreshData() {
+    var btn = document.getElementById('refreshBtn');
+    var icon = document.getElementById('refreshIcon');
+    btn.disabled = true;
+    btn.style.opacity = '0.6';
+    btn.style.cursor = 'wait';
+    icon.style.animation = 'spin 0.8s linear infinite';
+    window.location.href = '/history-category-complex?refresh=1';
+  }
+
+// ── Scroll entrance animations ──
+(function(){
+  var els = document.querySelectorAll('.anim-in');
+  if(!els.length) return;
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){ e.target.classList.add('visible'); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+  els.forEach(function(el){ io.observe(el); });
+})();
+
+  /* 手风琴切换 */
+  function toggleSection(header) {
+    var body = header.nextElementSibling;
+    var isOpen = header.classList.contains('open');
+    if (isOpen) {
+      header.classList.remove('open');
+      body.classList.remove('open');
+    } else {
+      header.classList.add('open');
+      body.classList.add('open');
+    }
+  }
+
+  function showReport(id) {
+    window.open('/exercise/' + id, '_blank');
+  }
+
+  // 热力图
+  <% if (exerciseHistory.length > 0) { %>
+  var cal = new CalHeatMap();
+  cal.init({
+    domain: 'month', subDomain: 'day', domainGutter: 6,
+    tooltip: true, range: 12,
+    start: new Date('<%= moment().startOf("month").startOf("day").subtract(1,"year").add(1,"month").format("YYYY-MM-DD") %>'),
+    data: <%- JSON.stringify(exerciseHeatMapData) %>,
+    domainLabelFormat: '%m月', displayLegend: false,
+    cellSize: 12,
+    legend: [15, 35, 70, 100],
+    onClick: function(date) {
+      var items = document.getElementsByClassName('ex-row');
+      for (var i = 0; i < items.length; i++) {
+        var d = new Date(items[i].querySelector('.date').innerText);
+        var same = d.getFullYear() === date.getFullYear() &&
+                   d.getMonth() === date.getMonth() &&
+                   d.getDate() === date.getDate();
+        if (same) { items[i].classList.toggle('highlight'); }
+        else { items[i].classList.remove('highlight'); }
+      }
+    }
+  });
+  // 初始化后自动滚到右侧（数据密集区），小月份留在左侧
+  var calContainer = document.querySelector('.cal-heatmap-container');
+  if (calContainer) {
+    setTimeout(function() { calContainer.scrollLeft = calContainer.scrollWidth; }, 100);
+  }
+  <% } %>
+</script>
+</body>
+</html>
