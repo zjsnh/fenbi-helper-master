@@ -65,13 +65,29 @@
 - 内置 **2 个题库共 1036 道题**：片段阅读 436 题（22 套）+ 花生逻辑推理 600 题（30 套）
 - 题库以 xlsx 文件存储于项目根目录，启动时由 `quizLoader.js` 加载到内存
 - **做题页**：单题展示、选项点击作答（支持 4/6 选项）、顶部进度条、总计时器、上一题/下一题/题号导航点
+- **多选题支持**：题型识别正则 `/多(选|项)/` 兼容"多选"、"多项选择"等变体；多选题作答不自动跳转，需手动点击下一题；判分时答案字母去重排序后比较
 - **标记疑题**：每题可标记为疑题，提交时单独统计
 - **自动判分**：提交后后端对照答案统计对错，生成练习记录
-- **结果页**：正确率/答对/答错/未答/疑题统计卡、题目列表（对错高亮+疑题标记）、解析展开、PDF 导出
-- **同步练习记录**：做题记录自动写入 `exercise_history.json`，在列表视图和分类聚合页显示"本地题库"标签
+- **结果页**：正确率/答对/答错/未答/疑题统计卡、题目列表（对错高亮+疑题标记）、解析展开（压缩空白避免大量空行）、PDF 导出
+- **同步练习记录**：做题记录自动写入 `exercise_history.json`，在列表视图和分类聚合页显示"本地题库"标签；列表视图标题显示为「一级题库名 + 题目数量」（如"【1】片段阅读600题题库 · 50题"），旧缓存通过 recordId 三级回填 source
 - **同步错题本**：错题自动写入 `wrong_q_local_quiz.json`，兼容现有错题本格式
 - **PDF 导出**：结果页一键导出错题+疑题为 PDF（复用 pdfGenerator）
 - **逻辑推理图片**：支持渲染题目图片（imageUrl 字段）
+
+### 本地题库上传与卸载
+- **上传题库**：题库列表页右上角「+ 上传题库」按钮，选择文件夹即可批量上传 xlsx / apkg 文件
+- **保留原始文件夹名**：上传时以原始文件夹名作为磁盘存储目录名，不自动重命名、不加时间戳
+- **动态加载**：上传后自动加载到题库列表，无需重启服务；配置持久化到 `uploaded-quizzes/config.json`
+- **卸载题库**：分类卡片 hover 显示「✕」卸载按钮，仅对上传题库生效，内置题库不可卸载
+- **格式规范弹窗**：上传弹窗含详细 xlsx 表头规范（题干/选项A~F/答案/题型/解析/知识点/图片URL/题号）与 apkg 字段规范（7 字段顺序固定 + `\x1f` 分隔 + `<br>` 选项格式）
+- **标准题库生成 Skill**：项目内置 `.trae/skills/standard-quiz-builder/SKILL.md`，可在 TRAE IDE 中调用生成符合规范的 xlsx/apkg 题库
+
+### 自定义出题
+- **题套勾选**：二级界面（题套列表）每张题套卡片左侧带勾选框，支持跨分类多选
+- **全选按键**：二级界面标题区右侧「全选（N）/ 取消全选」按钮，仅影响当前分类下的题套
+- **设置数量**：底部操作栏可输入本次出题数量，留空则全部
+- **随机抽样**：聚合所有勾选题套的题目后采用 Fisher-Yates 洗牌算法随机抽取指定数量
+- **临时题集**：自定义题集以 `custom_时间戳` 为 ID 存于内存缓存，复用现有做题/判分/结果页流程
 
 ### 登录与认证
 - 支持粉笔网账号密码登录（含图形验证码）
@@ -124,9 +140,11 @@ fenbi-helper-master/
 ├── fonts/                         # PDF 中文字体
 ├── fenbi-helper-design/          # 设计稿
 ├── cache/                        # 本地缓存（已 gitignore，含敏感数据）
+├── uploaded-quizzes/            # 上传的题库文件夹（已 gitignore，运行时生成）
 ├── 【1】片段阅读600题题库/         # 片段阅读题库（22 套 xlsx，436 题）
 ├── 【5】花生逻辑推理600题题库/     # 逻辑推理题库（30 套 xlsx，600 题）
 ├── 言语成语表_结构化.csv           # 成语词典数据源（598 条）
+├── .trae/skills/standard-quiz-builder/  # 标准题库生成 Skill（TRAE IDE）
 ├── Dockerfile
 └── package.json
 ```
@@ -165,11 +183,14 @@ node src/app.js
 | `/word-frequency` | 词语频次统计 |
 | `/shenlun-format` | 申论公文格式速查 |
 | `/quiz` | 本地题库选择页 |
+| `/quiz/custom` | 自定义出题（勾选题套 + 数量，Fisher-Yates 抽样） |
 | `/quiz/:setId` | 本地题库做题页 |
 | `/quiz-result/:recordId` | 本地题库结果页 |
 | `/setup` | 登录页 |
 | `/api/wrong-questions/pdf` | 导出错题本 PDF |
 | `/api/exercises/export-pdf` | 按练习记录批量导出错题/未写题目 PDF |
+| `/api/quiz/upload-folder` | 上传题库文件夹（xlsx/apkg，保留原始文件夹名） |
+| `/api/quiz/uninstall` | 卸载上传的题库（删除磁盘文件 + 移除配置） |
 | `/api/quiz/export-pdf` | 本地题库结果导出 PDF（错题+疑题） |
 | `/api/export-daily-wrong-pdf` | 按日期导出当日错题 PDF（含词语统计页） |
 | `/api/word-frequency/refresh` | 手动刷新词语统计缓存 |
@@ -179,10 +200,12 @@ node src/app.js
 ## 数据与缓存
 
 - 所有从粉笔 API 拉取的数据会缓存到本地 `cache/` 目录（JSON 文件）
-- 缓存键包括：`exercise_history`、`word_frequency`、`wrong_keypoint_tree`、`search_modules` 等
+- 缓存键包括：`exercise_history`、`word_frequency`、`wrong_keypoint_tree`、`search_modules`、`quiz_records` 等
 - 部分页面支持 `?refresh=1` 强制重新拉取
 - 词语统计缓存有效期 15 天，过期自动失效，可通过 `POST /api/word-frequency/refresh` 手动刷新
-- `cache/` 目录已加入 `.gitignore`，**不会上传到仓库**（含用户 cookie 等敏感数据）
+- 本地题库练习记录持久化在 `cache/quiz_records.json`（1 年有效期），做题后自动同步进 `exercise_history.json`
+- 上传题库存放于 `uploaded-quizzes/` 目录，配置持久化到 `uploaded-quizzes/config.json`，服务启动时自动加载
+- `cache/`、`uploaded-quizzes/` 目录已加入 `.gitignore`，**不会上传到仓库**（含用户 cookie 等敏感数据与个人题库）
 
 ## 工程约定
 
@@ -192,6 +215,8 @@ node src/app.js
 - 错题判定使用 `!q.correct`（避免 `=== false` 漏掉 `0`/`null`/`undefined` 等 falsy 值）
 - 动态页面禁用浏览器缓存（`Cache-Control: no-store`），确保数据最新
 - 页面返回通过 `?from=` 参数 + 白名单校验，防开放重定向
+- 多选题识别统一使用正则 `/多(选|项)/`，兼容"多选"、"多项选择"等变体（前端、后端、quizLoader 三处一致）
+- Koa-router 静态路径必须在参数路径之前注册（如 `/quiz/custom` 必须在 `/quiz/:setId` 之前），否则 "custom" 会被当作 setId 参数
 
 ## 部署
 
@@ -205,6 +230,7 @@ docker run -d -p 3000:3000 -v $(pwd)/cache:/app/cache fenbi-helper
 
 ## 历史更新
 
+- **2026-07-06** 新增本地题库上传/卸载功能（支持 xlsx/apkg 文件夹上传，保留原始文件夹名，配置持久化到 uploaded-quizzes/config.json）；新增自定义出题（题套勾选 + Fisher-Yates 随机抽样 + 二级界面全选按键）；新增多选题支持（识别正则统一为 /多(选|项)/，前端多选交互不自动跳转，后端判分排序）；列表视图标题改为一级题库名+题目数量（旧缓存通过 recordId 三级回填 source）；解析展示压缩空白避免大量空行；新增 standard-quiz-builder skill 用于生成符合规范的 xlsx/apkg 题库
 - **2026-07-05** 新增本地题库刷题模块：内置片段阅读 436 题 + 逻辑推理 600 题共 1036 题；做题页支持单题作答、总计时器、标记疑题、题号导航；结果页含对错高亮、疑题标记、解析展开；做题记录自动同步至练习记录列表和分类聚合页（"本地题库"标签）；错题自动同步至错题本；结果页支持一键导出错题+疑题 PDF
 - **2026-07-04** 新增申论公文格式模块（33 文种，三级卡片式浏览，含格式示意）；练习记录按 id 去重（修复跨分类重复）；练习记录多选导出错题/未写题目 PDF；热力图与分类模块滚动条优化；视频解析非会员容错（无视频自动隐藏按钮不报错）；导航栏统一补齐列表视图
 - **2026-07-03** 成语词典 CSV 集成；词语统计缓存策略（15 天 + 手动更新）；错题词语关联卡片重设计；正确答案高亮；页面返回逻辑（从哪来回哪去）；PDF 排版优化（智能选项布局、绝对 Y 坐标）
