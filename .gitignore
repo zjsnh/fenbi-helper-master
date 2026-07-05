@@ -47,6 +47,19 @@ jspm_packages/
 cache/
 *.zip
 
+# PDF 产物（含个人错题内容，勿上传）
+*.pdf
+
+# 临时测试脚本
+test_*.js
+_extract_pdf.js
+
+# 临时文件
+--brand-prefix
+
+# Excel 数据（与 CSV 重复，勿上传）
+*.xlsx
+
 # Snowpack dependency directory (https://snowpack.dev/)
 web_modules/
 
