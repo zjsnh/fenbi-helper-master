@@ -4,6 +4,7 @@ const qs = require('querystring');
 const percentile = require('percentile');
 
 const {httpRequest} = require('../util/httpUtil');
+const idiomDict = require('../util/idiomDict');
 
 let headers = {
     "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
@@ -88,6 +89,15 @@ let cleanTitle = function (title) {
         .replace(/网友回忆版/g, '')
         .replace(/第\d+题/g, '')
         .replace(/县级\+乡镇/g, '县级');
+}
+
+// 轻量 HTML 清理（用于 wordStatsList 携带的题干预览）
+function stripHtmlLite(h) {
+    if (!h) return '';
+    return h.replace(/<[^>]+>/g, '')
+        .replace(/&nbsp;/g, ' ').replace(/&ensp;/g, ' ').replace(/&emsp;/g, '  ')
+        .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+        .replace(/\s+/g, ' ').trim();
 }
 
 async function getQuestionByIds(questionIds) {
@@ -520,7 +530,6 @@ exports.getResultObj = async function (exerciseId, costThreshold, cookie) {
     // let questionMetaMap = await getQuestionMetaByIds(concernQuestions.map(q => q.questionId));
     // let questionKeyPointsMap = await getQuestionKeyPointsByIds(concernQuestions.map(q => q.questionId));
     let solutionMap = await getSolutionsByIds(concernQuestions.map(q => q.questionId), cookie);
-    let notesMap = await getNotesMapByIds(concernQuestions.map(q => q.questionId), cookie);
 
     // 按原始题目顺序排序，不把错题提前
     concernQuestions = _.orderBy(concernQuestions, ['idx'], ['asc']);
@@ -537,6 +546,14 @@ exports.getResultObj = async function (exerciseId, costThreshold, cookie) {
         q.difficulty = solutionObj.difficulty;
         // 正确答案
         q.correctAnswer = solutionObj.correctAnswer;
+        // 规范化为字母字符串，便于前端高亮
+        let _ca = solutionObj.correctAnswer;
+        let _cav = (_ca && typeof _ca === 'object') ? _ca.choice : _ca;
+        if (_cav === 0 || _cav === '0') _cav = 'A';
+        else if (_cav === 1 || _cav === '1') _cav = 'B';
+        else if (_cav === 2 || _cav === '2') _cav = 'C';
+        else if (_cav === 3 || _cav === '3') _cav = 'D';
+        q.correctAnswer = (_cav === 'A' || _cav === 'B' || _cav === 'C' || _cav === 'D') ? _cav : null;
         // 题目来源
         q.source = solutionObj.source;
 
@@ -561,12 +578,6 @@ exports.getResultObj = async function (exerciseId, costThreshold, cookie) {
         q.correctRatio = solutionObj.questionMeta.correctRatio;
 
         q.totalCount = solutionObj.questionMeta.totalCount;
-
-        if (notesMap[q.questionId]) {
-            q.note = notesMap[q.questionId];
-            q.wordList = parseWordListFromNote(q.note);
-            q.tagList = parseTagListFromNote(q.note);
-        }
 
         if (solutionObj.material) {
             q.material = solutionObj.material.content;
@@ -676,20 +687,70 @@ exports.getResultObj = async function (exerciseId, costThreshold, cookie) {
         }
     });
 
-    // 逻辑填空词语统计：使用全错题本的词语统计数据（来自 getWordFrequency）
-    // 而非仅当前练习的错题，确保词条完整
-    let wordStatsList = [];
-    try {
-        let freqData = await exports.getWordFrequency(cookie);
-        let allWords = [].concat(freqData.words || [], freqData.idioms || []);
-        wordStatsList = allWords.map(w => ({
-            word: w.word,
-            total: w.count,
-            questionIds: w.questionIds || []
-        }));
-    } catch (e) {
-        console.error('练习详情: 获取词语统计失败:', e.message);
-    }
+    // 逻辑填空词语统计：直接基于当前练习错题的选项实时统计
+    // （不依赖全错题本，因为当前练习的错题可能尚未进入错题本）
+    // wordStats 已按选项词语累积：total/chosen/correct/wrong/questions
+    // 这里只保留被选错的词语（wrong > 0），错误次数 = wrong
+    // 同时携带关联题目详细信息，供前端展开显示
+    let wordStatsList = Object.keys(wordStats)
+        .filter(word => wordStats[word].wrong > 0)            // 只保留有错题关联的词语
+        .map(word => {
+            let ws = wordStats[word];
+            // 只取答错的那部分题
+            let wrongQs = ws.questions
+                .filter(qa => {
+                    let q = concernQuestions.find(cq => cq.questionId == qa.questionId);
+                    return q && !q.correct;
+                });
+            let seenIds = new Set();
+            let questions = [];
+            let questionIds = [];
+            wrongQs.forEach(qa => {
+                if (seenIds.has(qa.questionId)) return;
+                seenIds.add(qa.questionId);
+                questionIds.push(Number(qa.questionId));
+                // 找回完整题目信息
+                let q = concernQuestions.find(cq => cq.questionId == qa.questionId);
+                if (q) {
+                    questions.push({
+                        questionId: qa.questionId,
+                        idx: q.idx,
+                        source: q.source || '未知来源',
+                        content: stripHtmlLite(q.content || ''),
+                        myAnswer: q.myAnswer,
+                        correctAnswer: normalizeAnswer(q.correctAnswer)
+                    });
+                }
+            });
+            return {
+                word,
+                total: ws.wrong,                                  // 错误次数
+                questionIds,                                      // 去重后的题ID数组
+                questions                                         // 关联题目详细信息
+            };
+        })
+        .filter(w => w.questionIds.length > 0)
+        .sort((a, b) => b.total - a.total);
+
+    // 注入成语词典释义/考频/组主题（CSV 数据，非成语无释义）
+    wordStatsList = idiomDict.enrich(wordStatsList);
+
+    // DEBUG: 临时日志
+    console.log('[DEBUG-DEF] logicFillQuestions数:', logicFillQuestions.length);
+    console.log('[DEBUG-DEF] wordStatsList前5条:');
+    wordStatsList.slice(0, 5).forEach(w => {
+        let isIdiom = /^[\u4e00-\u9fa5]{4}$/.test(w.word);
+        console.log('  word="' + w.word + '" isIdiom=' + isIdiom +
+                    ' def="' + (w.definition || '') + '"' +
+                    ' theme="' + (w.theme || '') + '"' +
+                    ' freq=' + (w.freq || 0) +
+                    ' qCount=' + (w.questions || []).length);
+    });
+    let idiomCount = wordStatsList.filter(w => /^[\u4e00-\u9fa5]{4}$/.test(w.word)).length;
+    let withDefCount = wordStatsList.filter(w => w.definition).length;
+    console.log('[DEBUG-DEF] 总词数=' + wordStatsList.length +
+                ' 四字成语数=' + idiomCount +
+                ' 有释义数=' + withDefCount);
 
     return {
         moment,
@@ -719,6 +780,77 @@ exports.addCollect = async function (questionId, cookie) {
         },
         body: null
     });
+}
+
+// 按日期统计当日错题：错题列表 + 关联词语统计
+exports.getDailyWrongStats = async function (date, cookie) {
+    // 读取练习记录缓存
+    let cached = cache.readCache('exercise_history');
+    if (!cached || !cached.data || !cached.data.exerciseHistory) {
+        return { date, questions: [], wordStatsList: [] };
+    }
+    let exerciseHistory = cached.data.exerciseHistory;
+    // 筛选当天完成的练习（按 finishedDate 字符串比对，避免时区问题）
+    let dayItems = exerciseHistory.filter(h => h.finishedDate === date);
+    if (dayItems.length === 0) {
+        return { date, questions: [], wordStatsList: [] };
+    }
+
+    // 收集当天所有练习中答错的题（去重：同 questionId 只保留一次）
+    let seenIds = new Set();
+    let wrongQuestions = [];
+    let wrongQuestionIds = [];
+    for (let item of dayItems) {
+        try {
+            let obj = await exports.getResultObj(item.id, 70, cookie);
+            if (!obj || !obj.concernQuestions) continue;
+            obj.concernQuestions.forEach(q => {
+                if (!q.correct && !seenIds.has(q.questionId)) {
+                    seenIds.add(q.questionId);
+                    // 统一转为数字，与 word_frequency 缓存中的 questionId 类型对齐
+                    wrongQuestionIds.push(Number(q.questionId));
+                    wrongQuestions.push({
+                        questionId: q.questionId,
+                        content: q.content,
+                        options: q.options,
+                        correctAnswer: q.correctAnswer,
+                        difficulty: q.difficulty,
+                        source: q.source,
+                        tags: q.tags,
+                        keypoints: q.keypoints,
+                        solution: q.solution,
+                        myAnswer: q.myAnswer,
+                        cost: q.cost
+                    });
+                }
+            });
+        } catch (e) {
+            console.error('当日错题: 练习 ' + item.id + ' 获取失败:', e.message);
+        }
+    }
+
+    // 逻辑填空词语统计：从全错题本词语频次中，筛选出与当日错题关联的词语
+    let wordStatsList = [];
+    try {
+        let freqData = await exports.getWordFrequency(cookie);
+        let allWords = [].concat(freqData.words || [], freqData.idioms || []);
+        let wrongIdSet = new Set(wrongQuestionIds);
+        wordStatsList = allWords
+            .map(w => ({
+                word: w.word,
+                total: w.count,
+                questionIds: (w.questionIds || []).filter(qid => wrongIdSet.has(qid))
+            }))
+            .filter(w => w.questionIds.length > 0);  // 只保留与当日错题关联的词语
+    } catch (e) {
+        console.error('当日错题: 获取词语统计失败:', e.message);
+    }
+
+    return {
+        date,
+        questions: wrongQuestions,
+        wordStatsList
+    };
 }
 
 exports.delCollect = async function (questionId, cookie) {
@@ -1018,12 +1150,17 @@ exports.search = async function (text, cookie, moduleFilter) {
 }
 
 // 从错题本逻辑填空题中收集选项词语频次统计
-exports.getWordFrequency = async function (cookie) {
+// cacheExpireMs: 15 天；forceRefresh=true 时强制重新拉取
+exports.getWordFrequency = async function (cookie, forceRefresh) {
     let cacheKey = 'word_frequency';
-    let cached = cache.readCache(cacheKey);
-    if (cached && cached.words) {
-        return cached;
+    const WORD_FREQ_EXPIRE_MS = 15 * 24 * 60 * 60 * 1000; // 15天
+    if (!forceRefresh) {
+        let cached = cache.readCache(cacheKey, WORD_FREQ_EXPIRE_MS);
+        if (cached && (cached.words || cached.idioms)) {
+            return cached;
+        }
     }
+    console.log('[WORD-FREQ] 缓存未命中或强制刷新，从API获取数据...');
 
     // 1. 获取错题本分类树
     let keypointTree = await getKeypointTree(cookie);
@@ -1111,7 +1248,7 @@ exports.getWordFrequency = async function (cookie) {
     // console.log('[WORD-FREQ] 逻辑填空题目数:', logicFillCount);
     // console.log('[WORD-FREQ] 收集到词语种类:', Object.keys(wordCountMap).length);
 
-    // 4. 四字成语（恰好4个汉字）全部统计，其他词语筛选>3次
+    // 4. 全部词语保留（不再按 count>3 过滤），仅剔除单字噪声
     let isIdiom = w => /^[\u4e00-\u9fa5]{4}$/.test(w);
     let allWords = Object.keys(wordCountMap).map(w => ({
         word: w,
@@ -1120,12 +1257,15 @@ exports.getWordFrequency = async function (cookie) {
     }));
 
     let idioms = allWords.filter(w => isIdiom(w.word)).sort((a, b) => b.count - a.count);
-    let words = allWords.filter(w => !isIdiom(w.word) && w.count > 3).sort((a, b) => b.count - a.count);
+    let words = allWords.filter(w => !isIdiom(w.word)).sort((a, b) => b.count - a.count);
+
+    // 注入成语词典释义/考频/组主题（CSV 数据）
+    idioms = idiomDict.enrich(idioms);
 
     // console.log('[WORD-FREQ] 四字成语数:', idioms.length, '高频词语数:', words.length);
 
     let data = { words, idioms, total: words.length + idioms.length, cachedAt: Date.now() };
-    cache.writeCache(cacheKey, data);
+    cache.writeCache(cacheKey, data, WORD_FREQ_EXPIRE_MS);
     return data;
 }
 

@@ -1,6 +1,6 @@
 # 粉笔助手（Fenbi Helper）
 
-国考 / 公考备考刷题辅助工具，基于粉笔网题库 API，提供练习记录分析、错题本整理、词语频次统计、PDF 错题本导出等功能。本地部署，数据缓存于本地，保护隐私。
+国考 / 公考备考刷题辅助工具，基于粉笔网题库 API，提供练习记录分析、错题本整理、词语频次统计、成语词典集成、PDF 错题本导出等功能。本地部署，数据缓存于本地，保护隐私。
 
 ## 功能特性
 
@@ -9,18 +9,46 @@
 - 按分类树聚合展示，支持练习报告查看
 - 单题详情页提供耗时分布图、知识点标签、收藏标记、笔记、评论、讲解视频
 - 题目按原始顺序展示，导航栏一键切换「全部题目 / 仅错题」
+- **正确答案高亮**：选项按 `opt-correct`（绿）/ `opt-wrong`（红）自动着色，后端将 `correctAnswer` 规范化为字母字符串
 
 ### 错题本
 - 按知识点分类树组织错题
 - 支持刷新错题本、按知识点筛选
 - 错题本 PDF 导出：题号深蓝醒目、题干加粗、选项中性灰，弱化装饰突出题目本身
 - 题目内可写笔记、收藏、造句查询
+- **当日错题 PDF**：按日期导出当日错题，含逻辑填空词语统计页
 
 ### 词语频次统计
 - 全错题本逻辑填空题选项词语自动提取
-- 区分**四字成语**（全部统计）与**普通词语**（出现 >3 次统计）
-- 点击词语可跳转关联错题
-- 练习详情页的「逻辑填空词语统计」直接复用全错题本数据，确保词条完整
+- 区分**四字成语**（全部统计）与**普通词语**（出现 >2 次统计）
+- 点击词语弹出关联错题面板，顶部展示词义、组主题、全局考频
+- 练习详情页的「逻辑填空词语统计」基于当前练习 `wordStats` 实时累积，不依赖全错题本
+- **本地缓存策略**：默认 15 天有效期，过期自动更新；支持右上角「手动更新」按钮强制刷新
+- 后端 `getWordFrequency` 支持 `forceRefresh` 参数，前端展示层过滤 `count > 2`
+
+### 成语词典集成
+- 从 `言语成语表_结构化.csv` 加载 598 条成语到内存 `Map<成语, {definition, freq, theme, groupNo}>`
+- 服务启动时通过 `idiomDict.js` 加载，提供 `lookup(idiom)` 与 `enrich(words)` 接口
+- 在练习详情页错题词语关联卡片、词语统计关联面板、PDF 词语统计页注入成语释义、组主题、考频
+- 卡片头部显示词语 + 组主题标签（成语）+ 释义省略号截断 + 错误次数徽章
+
+### 错题词语关联界面
+- 表格 → 可折叠卡片列表，按错误次数倒序排列
+- 卡片展开后显示关联错题列表（题号、来源、我的选项 vs 正确答案、题干预览 2 行截断）
+- 点击关联题目平滑滚动定位 + 高亮闪烁
+
+### 页面返回逻辑（从哪来回哪去）
+- 通过 URL 参数 `?from=源路径` 记录来源页
+- 详情页返回按钮根据 `from` 跳转回来源页
+- 白名单校验：仅允许跳转到 `/history-category-complex`、`/history-category`、`/history`、`/wrong-questions`、`/word-frequency`，非法值回退到默认页（防开放重定向）
+- 相比 `history.back()` 或 `Referer`：刷新页面后仍能正确返回
+
+### PDF 生成优化
+- 智能选项布局：根据选项文本宽度自动决策 4 列 / 2 列 / 1 列竖排
+- 文本宽度估算：中文字符 ≈ 字号，ASCII ≈ 字号 × 0.55
+- 绝对定位渲染：固定 Y 坐标绘制选项行，避免字体重叠
+- 行级分页检查：逐行检查是否需要分页
+- 词语统计页：双列布局（词语 | 错误次数），错误次数 = 关联错题数
 
 ### 登录与认证
 - 支持粉笔网账号密码登录（含图形验证码）
@@ -29,12 +57,12 @@
 ## 技术栈
 
 - **后端**：Node.js + Koa 2 + Koa-Router + koa-ejs（服务端渲染）
-- **模板**：EJS
+- **模板**：EJS（`cache: false`，动态页面禁用浏览器缓存）
 - **PDF 生成**：PDFKit
 - **工具库**：lodash、moment、percentile、qs
 - **图表**：ECharts（前端）
 - **HTTP**：request
-- **字体**：simhei.ttf / msyh.ttc / CascadiaMono.ttf（PDF 中文支持）
+- **字体**：simhei.ttf / msyh.ttc / CascadiaMono.ttf / SimSun.ttf（PDF 中文支持）
 
 ## 目录结构
 
@@ -48,6 +76,7 @@ fenbi-helper-master/
 │   ├── util/
 │   │   ├── cacheUtil.js           # 本地 JSON 文件缓存
 │   │   ├── httpUtil.js            # 粉笔 API 请求封装
+│   │   ├── idiomDict.js           # 成语词典加载（CSV → 内存 Map）
 │   │   └── pdfGenerator.js        # 错题本 PDF 生成器
 │   └── views/
 │       ├── exerciseResult.ejs     # 练习报告详情页
@@ -66,6 +95,7 @@ fenbi-helper-master/
 ├── fonts/                         # PDF 中文字体
 ├── fenbi-helper-design/          # 设计稿
 ├── cache/                        # 本地缓存（已 gitignore，含敏感数据）
+├── 言语成语表_结构化.csv           # 成语词典数据源（598 条）
 ├── Dockerfile
 └── package.json
 ```
@@ -104,6 +134,9 @@ node src/app.js
 | `/word-frequency` | 词语频次统计 |
 | `/setup` | 登录页 |
 | `/api/wrong-questions/pdf` | 导出错题本 PDF |
+| `/api/export-daily-wrong-pdf` | 按日期导出当日错题 PDF（含词语统计页） |
+| `/api/word-frequency/refresh` | 手动刷新词语统计缓存 |
+| `/api/wrong-questions-by-ids` | 按 ID 批量获取题目详情 |
 | `/api/debug/exercises` | 调试接口（探查分类与练习数据） |
 
 ## 数据与缓存
@@ -111,14 +144,17 @@ node src/app.js
 - 所有从粉笔 API 拉取的数据会缓存到本地 `cache/` 目录（JSON 文件）
 - 缓存键包括：`exercise_history`、`word_frequency`、`wrong_keypoint_tree`、`search_modules` 等
 - 部分页面支持 `?refresh=1` 强制重新拉取
+- 词语统计缓存有效期 15 天，过期自动失效，可通过 `POST /api/word-frequency/refresh` 手动刷新
 - `cache/` 目录已加入 `.gitignore`，**不会上传到仓库**（含用户 cookie 等敏感数据）
 
 ## 工程约定
 
 - 练习记录数据获取采用 **cursor 游标分页**，全量拉取不去重
 - 三个 categoryId 并发拉取：`1=模考/真题`、`2=每日演练`、`3=专项智能练习`
-- 词语统计区分成语（4 字汉字）与普通词（>3 次出现）
+- 词语统计区分成语（4 字汉字全部统计）与普通词（count > 2 才展示）
+- 错题判定使用 `!q.correct`（避免 `=== false` 漏掉 `0`/`null`/`undefined` 等 falsy 值）
 - 动态页面禁用浏览器缓存（`Cache-Control: no-store`），确保数据最新
+- 页面返回通过 `?from=` 参数 + 白名单校验，防开放重定向
 
 ## 部署
 
@@ -132,6 +168,7 @@ docker run -d -p 3000:3000 -v $(pwd)/cache:/app/cache fenbi-helper
 
 ## 历史更新
 
+- **2026-07** 成语词典 CSV 集成；词语统计缓存策略（15 天 + 手动更新）；错题词语关联卡片重设计；正确答案高亮；页面返回逻辑（从哪来回哪去）；PDF 排版优化（智能选项布局、绝对 Y 坐标）
 - **2026-07** 词语统计数据源切换为全错题本数据；按钮配色与 PDF 样式优化；新增每日演练数据拉取；分类树与历史记录聚合重构
 - **2020-07** 讲解视频、PDF 导出、笔记、评论、耗时分析图、习题标签
 - **2020-07-04** 题目展开收起、省市联考国考标签、收藏标记

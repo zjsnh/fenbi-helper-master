@@ -221,13 +221,30 @@
     }
     @keyframes cardReveal {
       from { opacity: 0; transform: translateY(14px) scale(0.98); }
-      to   { opacity: 1; transform: translateY(0) scale(1); }
+      to   { opacity: 1; transform: translateY(0); }
     }
+
+    /* 返回链接 */
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--brand-600);
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: 980px;
+      transition: all 0.25s;
+      margin-bottom: 16px;
+    }
+    .back-link:hover { background: var(--brand-50); color: var(--brand-700); }
   </style>
 </head>
 <body>
 
 <div class="page-wrap">
+  <a href="<%= backUrl %>" class="back-link">&#x2190; 返回列表</a>
   <!-- 页面头部 -->
   <div class="q-hero">
     <div class="hero-label">题目详情</div>

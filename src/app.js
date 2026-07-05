@@ -69,12 +69,27 @@ app.use(async(ctx, next) => {
 app.listen(3000);
 
 
+// 来源页白名单：仅允许 from 参数跳转到这些页面，防止开放重定向
+const ALLOWED_FROM_PATHS = new Set([
+    '/history-category-complex',
+    '/history-category',
+    '/history',
+    '/wrong-questions',
+    '/word-frequency'
+]);
+
+function resolveBackUrl(from) {
+    if (from && ALLOWED_FROM_PATHS.has(from)) return from;
+    return '/history-category-complex';
+}
+
 router.get('/exercise/:exerciseId', async ctx => {
     let exerciseId = ctx.params.exerciseId;
     let costThreshold = Number.parseInt(ctx.query.cost || 70);
     let cookie = ctx.request.headers['cookie']
     let renderObj = await exerciseResult.getResultObj(exerciseId, costThreshold, cookie);
     if (renderObj) {
+        renderObj.backUrl = resolveBackUrl(ctx.query.from);
         await ctx.render('exerciseResult', renderObj);
     } else {
         ctx.redirect('/setup?redirectPath=' + ctx.originalUrl);
@@ -86,6 +101,7 @@ router.get('/question/:questionId', async ctx => {
     let cookie = ctx.request.headers['cookie']
     let renderObj = await exerciseResult.getQuestion(questionId, cookie);
     if (renderObj) {
+        renderObj.backUrl = resolveBackUrl(ctx.query.from);
         await ctx.render('question', renderObj);
     } else {
         ctx.redirect('/setup?redirectPath=' + ctx.originalUrl);
@@ -286,9 +302,30 @@ router.get('/api/word-frequency', async ctx => {
         return;
     }
     try {
-        ctx.body = await exerciseResult.getWordFrequency(cookie);
+        let forceRefresh = ctx.query.refresh === '1';
+        ctx.body = await exerciseResult.getWordFrequency(cookie, forceRefresh);
     } catch (e) {
         ctx.body = { error: e.message, words: [], total: 0 };
+    }
+});
+
+router.post('/api/word-frequency/refresh', async ctx => {
+    let cookie = ctx.request.headers['cookie'];
+    if (!cookie || !cookie.includes('userid')) {
+        ctx.body = { error: '请先登录' };
+        ctx.status = 401;
+        return;
+    }
+    try {
+        let data = await exerciseResult.getWordFrequency(cookie, true);
+        ctx.body = {
+            code: 200,
+            message: '更新成功，共 ' + (data.words.length + data.idioms.length) + ' 条词语',
+            total: data.words.length + data.idioms.length,
+            cachedAt: data.cachedAt
+        };
+    } catch (e) {
+        ctx.body = { code: 500, message: '更新失败：' + e.message };
     }
 });
 
@@ -374,6 +411,45 @@ router.post('/api/wrong-questions/pdf', async ctx => {
         ctx.body = pdfBuffer;
     } catch (e) {
         console.error('PDF生成失败:', e.message);
+        ctx.body = { error: 'PDF生成失败: ' + e.message };
+        ctx.status = 500;
+    }
+});
+
+// 按日期导出当日错题 PDF（含逻辑填空词语统计页）
+router.post('/api/export-daily-wrong-pdf', async ctx => {
+    let cookie = ctx.request.headers['cookie'];
+    if (!cookie || !cookie.includes('userid')) {
+        ctx.body = { error: '请先登录' };
+        ctx.status = 401;
+        return;
+    }
+
+    try {
+        const { date } = ctx.request.body;
+        if (!date) {
+            ctx.body = { error: '请提供日期' };
+            ctx.status = 400;
+            return;
+        }
+        console.log('当日错题统计: date=' + date);
+        const pdfGenerator = require('./util/pdfGenerator');
+
+        const stats = await exerciseResult.getDailyWrongStats(date, cookie);
+
+        if (!stats.questions || stats.questions.length === 0) {
+            ctx.body = { error: '该日期无错题数据' };
+            ctx.status = 404;
+            return;
+        }
+
+        const pdfBuffer = await pdfGenerator.generateDailyWrongStatsPDF(stats);
+
+        ctx.set('Content-Type', 'application/pdf');
+        ctx.set('Content-Disposition', `attachment; filename="wrong-stats-${date}.pdf"`);
+        ctx.body = pdfBuffer;
+    } catch (e) {
+        console.error('当日错题PDF生成失败:', e.message);
         ctx.body = { error: 'PDF生成失败: ' + e.message };
         ctx.status = 500;
     }

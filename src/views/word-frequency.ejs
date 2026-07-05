@@ -84,6 +84,37 @@
       font-size: 16px;
     }
 
+    /* ── 手动更新按钮 ── */
+    .refresh-btn {
+      background: var(--brand-600, #0066cc);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s var(--ease-out), transform 0.15s var(--ease-out);
+    }
+    .refresh-btn:hover { background: var(--brand-700, #0052a3); }
+    .refresh-btn:active { transform: scale(0.97); }
+    .refresh-btn:disabled {
+      background: var(--text-100, #c0c0c0);
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+    .refresh-btn .spin {
+      display: inline-block;
+      width: 12px; height: 12px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
     /* ── 分类卡片网格 ── */
     .cat-grid {
       display: grid;
@@ -209,10 +240,10 @@
       background: var(--card);
       border: 0.5px solid var(--border-light);
       border-radius: 10px;
-      padding: 12px 14px;
+      padding: 10px 14px;
       display: flex;
-      align-items: center;
-      justify-content: space-between;
+      flex-direction: column;
+      gap: 4px;
       cursor: pointer;
       transition: border-color 0.25s, box-shadow 0.25s;
       opacity: 0;
@@ -228,11 +259,43 @@
       border-color: var(--g-300);
       box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     }
+    .word-card .word-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
     .word-card .word-text {
       font-size: 15px;
       font-weight: 700;
       color: #0a1628;
       font-family: var(--font-display);
+    }
+    .word-card .word-meta {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .word-card .word-freq {
+      font-size: 11px;
+      color: var(--text-500);
+      background: var(--text-50, #f2f2f7);
+      padding: 2px 8px;
+      border-radius: 10px;
+      white-space: nowrap;
+    }
+    .word-card .word-definition {
+      font-size: 12px;
+      color: var(--text-sec);
+      line-height: 1.5;
+      margin-top: 2px;
+    }
+    .word-card .word-theme {
+      font-size: 10px;
+      color: var(--brand-600, #0066cc);
+      background: rgba(0,102,204,0.06);
+      padding: 1px 6px;
+      border-radius: 8px;
+      white-space: nowrap;
     }
     .word-card .word-count {
       font-size: 12px;
@@ -305,6 +368,50 @@
       transition: all 0.2s;
     }
     .question-panel-header .close-btn:hover { background: var(--g-50); color: var(--text-900); }
+
+    /* ── 词语释义区块 ── */
+    .word-def-box {
+      background: linear-gradient(135deg, #f0f7ff 0%, #e6f0ff 100%);
+      border: 0.5px solid #c5d9f5;
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .word-def-word {
+      font-size: 18px;
+      font-weight: 700;
+      color: #0a1628;
+      font-family: var(--font-display);
+    }
+    .word-def-theme {
+      display: inline-block;
+      font-size: 11px;
+      color: var(--brand-600, #0066cc);
+      background: rgba(0,102,204,0.1);
+      padding: 3px 10px;
+      border-radius: 10px;
+      align-self: flex-start;
+    }
+    .word-def-freq {
+      display: inline-block;
+      font-size: 11px;
+      color: #b8860b;
+      background: #fef9ee;
+      padding: 3px 10px;
+      border-radius: 10px;
+      align-self: flex-start;
+    }
+    .word-def-text {
+      font-size: 14px;
+      color: var(--text-900);
+      line-height: 1.6;
+      padding-top: 4px;
+      border-top: 1px dashed rgba(0,102,204,0.2);
+      margin-top: 4px;
+    }
 
     .question-item {
       padding: 16px 0;
@@ -427,6 +534,7 @@
       <div class="stats-bar-item">四字成语：<b id="idiomCount">-</b></div>
       <div class="stats-bar-item">高频词语：<b id="wordCount">-</b></div>
       <div class="stats-bar-item">更新时间：<b id="updateTime">-</b></div>
+      <button id="refreshBtn" type="button" class="refresh-btn" onclick="refreshWordFrequency()">手动更新</button>
     </div>
 
     <div class="cat-grid">
@@ -519,7 +627,7 @@
         return;
       }
 
-      allWords = data.words || [];
+      allWords = (data.words || []).filter(w => w.count > 2);   // 页面只展示出现>2次的非成语词语
       allIdioms = data.idioms || [];
 
       document.getElementById('idiomCount').textContent = allIdioms.length;
@@ -536,6 +644,45 @@
       document.getElementById('categoryPage').innerHTML =
         '<div class="empty-state"><div class="icon">&#x26A0;</div><p>加载失败：' + e.message + '</p></div>';
     });
+
+  // 手动更新：强制服务端重新拉取全错题本并统计
+  function refreshWordFrequency() {
+    var btn = document.getElementById('refreshBtn');
+    if (btn.disabled) return;
+    btn.disabled = true;
+    var origText = btn.textContent;
+    btn.innerHTML = '<span class="spin"></span>更新中...';
+    fetch('/api/word-frequency/refresh', { method: 'POST' })
+      .then(function(r) { return r.json(); })
+      .then(function(res) {
+        if (res && res.code === 200) {
+          // 重新加载页面数据
+          return fetch('/api/word-frequency').then(function(r) { return r.json(); });
+        } else {
+          throw new Error((res && res.message) || '更新失败');
+        }
+      })
+      .then(function(data) {
+        if (!data || data.error) throw new Error((data && data.error) || '加载失败');
+        allWords = (data.words || []).filter(w => w.count > 2);
+        allIdioms = data.idioms || [];
+        document.getElementById('idiomCount').textContent = allIdioms.length;
+        document.getElementById('wordCount').textContent = allWords.length;
+        document.getElementById('idiomTotal').textContent = allIdioms.length;
+        document.getElementById('wordTotal').textContent = allWords.length;
+        if (data.cachedAt) {
+          document.getElementById('updateTime').textContent = new Date(data.cachedAt).toLocaleString('zh-CN');
+        }
+        if (currentType) showWordList(currentType);  // 刷新当前列表
+        btn.innerHTML = '更新成功';
+        setTimeout(function(){ btn.innerHTML = origText; btn.disabled = false; }, 1500);
+      })
+      .catch(function(e) {
+        btn.innerHTML = '失败';
+        setTimeout(function(){ btn.innerHTML = origText; btn.disabled = false; }, 1500);
+        alert('更新失败：' + e.message);
+      });
+  }
 
   function showWordList(type) {
     currentType = type;
@@ -555,9 +702,18 @@
     var html = '<div class="word-grid">';
     list.forEach(function(item) {
       var countClass = item.count >= 10 ? 'word-count-high' : item.count >= 6 ? 'word-count-mid' : 'word-count-low';
-      html += '<div class="word-card" onclick="showWordQuestions(\'' + item.word.replace(/'/g, "\\'") + '\')">';
+      var safeWord = item.word.replace(/'/g, "\\'");
+      html += '<div class="word-card" onclick="showWordQuestions(\'' + safeWord + '\')">';
+      html += '<div class="word-head">';
       html += '<span class="word-text">' + item.word + '</span>';
+      html += '<div class="word-meta">';
+      // 成语且有考频时显示考频
+      if (item.freq) {
+        html += '<span class="word-freq" title="全局考频">考' + item.freq + '</span>';
+      }
       html += '<span class="word-count ' + countClass + '">' + item.count + '次</span>';
+      html += '</div>';
+      html += '</div>';
       html += '</div>';
     });
     html += '</div>';
@@ -594,6 +750,22 @@
       }
 
       var html = '';
+
+      // 词语释义区块（成语词典中存在时显示）
+      if (item.definition || item.theme || item.freq) {
+        html += '<div class="word-def-box">';
+        html += '<div class="word-def-word">' + word + '</div>';
+        if (item.theme) {
+          html += '<span class="word-def-theme">' + item.theme + '</span>';
+        }
+        if (item.freq) {
+          html += '<span class="word-def-freq">全局考频 ' + item.freq + '</span>';
+        }
+        if (item.definition) {
+          html += '<div class="word-def-text">' + item.definition + '</div>';
+        }
+        html += '</div>';
+      }
       questions.forEach(function(q, idx) {
         html += '<div class="question-item">';
         html += '<div class="q-source"><span class="q-num">第' + (idx+1) + '题</span>' + (q.source || '未知来源') + '</div>';

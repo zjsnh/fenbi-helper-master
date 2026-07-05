@@ -46,6 +46,29 @@
       height: 1px;
       background: linear-gradient(90deg, var(--g-200), transparent);
     }
+    .export-day-btn {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 14px;
+      border-radius: 8px;
+      border: 0.5px solid var(--g-300);
+      background: var(--g-50);
+      color: var(--g-700);
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: all 0.2s var(--ease-out);
+      font-family: inherit;
+    }
+    .export-day-btn:hover {
+      background: var(--g-200);
+      border-color: var(--g-400);
+      color: var(--g-800);
+    }
+    .export-day-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
 
     /* 列表行 */
     .ex-row {
@@ -187,6 +210,7 @@
         <span class="date-text"><%= displayDate %></span>
         <span class="date-count"><%= items.length %> 次练习</span>
         <span class="deco-line"></span>
+        <button class="export-day-btn" onclick="exportDailyWrong(this, '<%= dateKey %>')" title="导出当天错题与错误词语为 PDF">导出当日错题</button>
       </div>
 
       <% for (let h of items) {
@@ -224,7 +248,42 @@
   els.forEach(function(el){ io.observe(el); });
 })();
 
-  function showReport(id) { window.location = '/exercise/'+id; }
+  function showReport(id) { window.location = '/exercise/'+id+'?from=/history'; }
+
+  // 按日期导出当日错题 PDF
+  function exportDailyWrong(btn, date) {
+    if (!date) return;
+    if (!confirm('将导出 ' + date + ' 当天的错题与错误词语统计，确认开始？')) return;
+    var originText = btn.innerText;
+    btn.disabled = true;
+    btn.innerText = '生成中...';
+    fetch('/api/export-daily-wrong-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date: date })
+    })
+    .then(function(r) {
+      if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || '导出失败'); });
+      return r.blob();
+    })
+    .then(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = '错题-' + date + '.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    })
+    .catch(function(e) {
+      alert('导出失败：' + e.message);
+    })
+    .finally(function() {
+      btn.disabled = false;
+      btn.innerText = originText;
+    });
+  }
 </script>
 </body>
 </html>

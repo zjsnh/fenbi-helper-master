@@ -377,7 +377,7 @@
         card.className = 'sr-card';
         card.style.animationDelay = (idx * 0.04) + 's';
         card.onclick = function() {
-          window.open('/question/' + data.questionId, '_blank');
+          window.open('/question/' + data.questionId + '?from=/search', '_blank');
         };
 
         // 元信息行：模块标签 + 来源
