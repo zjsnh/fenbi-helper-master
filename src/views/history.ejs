@@ -178,6 +178,7 @@
   <a href="/history" class="active">列表视图</a>
   <a href="/wrong-questions">错题本</a>
   <a href="/word-frequency">词语统计</a>
+  <a href="/quiz">本地题库</a>
   <a href="/shenlun-format">公文格式</a>
   <a href="/setup" style="margin-left:auto;">切换账号</a>
 </div>
@@ -216,15 +217,16 @@
 
       <% for (let h of items) {
         var rateClass = h.correctRate >= 80 ? 'high' : h.correctRate >= 50 ? 'mid' : 'low';
+        var isLocalQuiz = !!h._isLocalQuiz;
       %>
-        <div class="ex-row" onclick="showReport(<%= h.id %>)">
+        <div class="ex-row" onclick="showReport('<%= h.id %>', <%= isLocalQuiz %>)">
           <span class="rate <%= rateClass %>"><%= h.correctRate %>%</span>
           <div class="main">
-            <div class="title"><%= cleanTitle(h.sheet.name) %></div>
+            <div class="title"><%= cleanTitle(h.sheet.name) %><% if (isLocalQuiz) { %> <span style="font-size:11px;color:#0066cc;background:#e6f0ff;padding:1px 7px;border-radius:8px;border:1px solid #b8d4ff;margin-left:6px;font-weight:600;">本地题库</span><% } %></div>
             <div class="meta">
               <span><%= h.answerCount %> 题</span>
               <span><%= Math.round(moment.duration(h.elapsedTime,'seconds').asMinutes().toFixed(1)) %> 分钟</span>
-              <span><%= h.client==='WEB'||h.client==='APP_WEB'?'电脑端':'手机端' %></span>
+              <span><%= isLocalQuiz ? '本地题库' : (h.client==='WEB'||h.client==='APP_WEB'?'电脑端':'手机端') %></span>
             </div>
           </div>
           <span class="time"><%= moment(h.updatedTime).format('HH:mm') %></span>
@@ -249,7 +251,13 @@
   els.forEach(function(el){ io.observe(el); });
 })();
 
-  function showReport(id) { window.location = '/exercise/'+id+'?from=/history'; }
+  function showReport(id, isLocalQuiz) {
+    if (isLocalQuiz) {
+      window.location = '/quiz-result/' + id + '?from=/history';
+    } else {
+      window.location = '/exercise/'+id+'?from=/history';
+    }
+  }
 
   // 按日期导出当日错题 PDF
   function exportDailyWrong(btn, date) {
@@ -269,13 +277,8 @@
     })
     .then(function(blob) {
       var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = '错题-' + date + '.pdf';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      window.open(url, '_blank');
+      setTimeout(function() { URL.revokeObjectURL(url); }, 60000);
     })
     .catch(function(e) {
       alert('导出失败：' + e.message);

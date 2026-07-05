@@ -18,6 +18,8 @@ const router = new KoaRouter();
 
 const exerciseResult = require('./service/exercisesResult');
 const loginService = require('./service/loginService');
+const quizLoader = require('./util/quizLoader');
+const quizRecord = require('./util/quizRecord');
 
 render(app, {
     root: path.join(__dirname, 'views'),
@@ -75,7 +77,8 @@ const ALLOWED_FROM_PATHS = new Set([
     '/history-category',
     '/history',
     '/wrong-questions',
-    '/word-frequency'
+    '/word-frequency',
+    '/quiz'
 ]);
 
 function resolveBackUrl(from) {
@@ -169,6 +172,362 @@ router.get('/calc', async ctx => {
 
 router.get('/shenlun-format', async ctx => {
     await ctx.render('shenlun-format', {});
+});
+
+// ══════════════════════════════════════
+//  本地题库刷题模块
+// ══════════════════════════════════════
+router.get('/quiz', async ctx => {
+    const groups = await quizLoader.listSets();
+    const progressMap = quizRecord.getAllSetProgress();
+
+    // 组装数据
+    let totalQuestions = 0;
+    let totalSets = 0;
+    let totalAnswered = 0;
+    const sources = [];
+    Object.keys(groups).forEach(sourceName => {
+        const sets = groups[sourceName].map(s => {
+            const p = progressMap[s.setId] || { doneCount: 0, bestRate: null };
+            totalAnswered += p.doneCount * s.questionCount;
+            return {
+                setId: s.setId,
+                setName: s.setName,
+                source: s.source,
+                questionCount: s.questionCount,
+                doneCount: p.doneCount || 0,
+                bestRate: p.bestRate !== null && p.bestRate >= 0 ? p.bestRate : null
+            };
+        });
+        const totalQ = sets.reduce((sum, s) => sum + s.questionCount, 0);
+        totalQuestions += totalQ;
+        totalSets += sets.length;
+        sources.push({ name: sourceName, sets, totalQ });
+    });
+
+    await ctx.render('quiz-list', {
+        sources, totalSets, totalQuestions, totalAnswered
+    });
+});
+
+router.get('/quiz/:setId', async ctx => {
+    const set = await quizLoader.getSet(ctx.params.setId);
+    if (!set) {
+        ctx.redirect('/quiz');
+        return;
+    }
+    await ctx.render('quiz-play', {
+        setId: set.setId,
+        setName: set.setName,
+        source: set.source,
+        questions: set.questions
+    });
+});
+
+// 提交判分
+router.post('/quiz/:setId/submit', async ctx => {
+    const setId = ctx.params.setId;
+    const set = await quizLoader.getSet(setId);
+    if (!set) {
+        ctx.body = { error: '题套不存在' };
+        ctx.status = 404;
+        return;
+    }
+
+    const body = ctx.request.body;
+    const answers = body.answers || {};          // { qNo: 'A' }
+    const flaggedSet = new Set((body.flagged || []).map(n => Number(n)));
+    const startTime = body.startTime || Date.now();
+    const endTime = body.endTime || Date.now();
+    const durationMs = body.durationMs || (endTime - startTime);
+
+    // 判分
+    let correctCount = 0, wrongCount = 0, unansweredCount = 0;
+    const questions = set.questions.map(q => {
+        const myAnswer = answers[q.qNo] || '';
+        let correct;
+        if (!myAnswer) {
+            unansweredCount++;
+            correct = null; // 未答
+        } else if (myAnswer === q.answer) {
+            correctCount++;
+            correct = true;
+        } else {
+            wrongCount++;
+            correct = false;
+        }
+        return {
+            uid: q.uid,
+            qNo: q.qNo,
+            type: q.type,
+            stem: q.stem,
+            options: q.options,
+            answer: q.answer,
+            myAnswer: myAnswer,
+            correct: correct,
+            flagged: flaggedSet.has(q.qNo),
+            analysis: q.analysis,
+            knowledge: q.knowledge,
+            imageUrl: q.imageUrl
+        };
+    });
+
+    const answeredCount = correctCount + wrongCount;
+    const accuracy = answeredCount > 0
+        ? Math.round((correctCount / answeredCount) * 1000) / 10
+        : 0;
+    const flaggedCount = questions.filter(q => q.flagged).length;
+
+    const recordId = 'quiz_' + setId + '_' + Date.now();
+    const finishedTime = moment(endTime).format('YYYY-MM-DD HH:mm:ss');
+    const finishedDate = moment(endTime).format('YYYY-MM-DD');
+    const durationDesc = formatDuration(durationMs);
+
+    const record = {
+        recordId,
+        setId,
+        setName: set.setName,
+        source: set.source,
+        startTime,
+        endTime,
+        durationMs,
+        durationDesc,
+        finishedTime,
+        finishedDate,
+        questionCount: set.questions.length,
+        answeredCount,
+        correctCount,
+        wrongCount,
+        unansweredCount,
+        accuracy,
+        flaggedCount,
+        questions,
+        // 兼容 exercise_history 字段
+        id: recordId,
+        cleanName: set.setName,
+        sheet: { name: set.setName, type: 999, questionCount: set.questions.length },
+        updatedTime: endTime,
+        elapsedTime: Math.round(durationMs / 1000),
+        answerCount: answeredCount,
+        correctRate: accuracy,
+        status: 1,
+        client: 'WEB',
+        userAnswers: {},
+        _isLocalQuiz: true
+    };
+
+    // 保存到 quiz_records
+    quizRecord.saveRecord(record);
+
+    // 同步错题到 wrong_q 缓存（keypointId = 'local_quiz'）
+    syncWrongQuestionsToCache(questions, record);
+
+    // 同步到 exercise_history 缓存（合并本地题库记录到练习记录）
+    syncToExerciseHistory(record);
+
+    console.log('Quiz 提交: ' + set.setName + ' 正确率=' + accuracy + '% 用时=' + durationDesc);
+    ctx.body = { recordId, accuracy, correctCount, wrongCount, unansweredCount };
+});
+
+function formatDuration(ms) {
+    const totalSec = Math.floor(ms / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return m + '分' + (s < 10 ? '0' : '') + s + '秒';
+}
+
+// 同步错题到 wrong_q 缓存
+function syncWrongQuestionsToCache(questions, record) {
+    const cache = require('./util/cacheUtil');
+    const cacheKey = 'wrong_q_local_quiz';
+    let cached = cache.readCache(cacheKey, 365 * 24 * 60 * 60 * 1000);
+    let existing = (cached && cached.questions) || [];
+
+    // 移除该 recordId 下的旧错题（重新提交时替换）
+    existing = existing.filter(q => q.recordId !== record.recordId);
+
+    // 加入本次错题
+    questions.forEach(q => {
+        if (q.correct === false) {
+            existing.push({
+                questionId: q.uid,
+                recordId: record.recordId,
+                setId: record.setId,
+                content: q.stem,
+                options: q.options,
+                correctAnswer: { choice: String.fromCharCode(65 + q.options.indexOf(q.answer) >= 0 ? q.options.indexOf(q.answer) : 0), type: 201 },
+                correctAnswerLetter: q.answer,
+                myAnswer: q.myAnswer,
+                difficulty: 3,
+                source: record.setName,
+                tags: [],
+                keypoints: [record.source, q.knowledge].filter(Boolean),
+                correctRatio: null,
+                mostWrongAnswer: null,
+                solution: q.analysis,
+                _isLocalQuiz: true
+            });
+        }
+    });
+
+    cache.writeCache(cacheKey, { questions: existing }, 365 * 24 * 60 * 60 * 1000);
+    console.log('错题本同步: 共 ' + existing.length + ' 道本地题库错题');
+}
+
+// 同步到 exercise_history 缓存
+function syncToExerciseHistory(record) {
+    const cache = require('./util/cacheUtil');
+    const cacheKey = 'exercise_history';
+    let cached = cache.readCache(cacheKey, 30 * 24 * 60 * 60 * 1000);
+    if (!cached || !cached.data) {
+        // 没有缓存，初始化一个空结构
+        cached = {
+            _cachedAt: Date.now(),
+            _expireMs: 30 * 24 * 60 * 60 * 1000,
+            data: {
+                groupItems: [],
+                exerciseHeatMapData: {},
+                exerciseHistoryGroup: {},
+                exerciseHistory: []
+            }
+        };
+    }
+    const data = cached.data;
+
+    // 移除该 recordId 的旧记录
+    data.exerciseHistory = (data.exerciseHistory || []).filter(h => h.id !== record.id);
+
+    // 插入到列表头部（最新优先）
+    data.exerciseHistory.unshift({
+        id: record.id,
+        key: record.id,
+        userId: 0,
+        createdTime: record.startTime,
+        updatedTime: record.endTime,
+        status: 1,
+        quizId: 0,
+        client: 'WEB',
+        features: {},
+        version: 0,
+        userAnswers: {},
+        elapsedTime: record.elapsedTime,
+        currentTime: record.endTime,
+        sheet: {
+            id: 0,
+            keypointId: 0,
+            type: 999,
+            name: record.setName,
+            paperId: 0,
+            questionCount: record.questionCount,
+            time: 0,
+            chapters: [],
+            questionIds: []
+        },
+        questionCount: record.questionCount,
+        correctCount: record.correctCount,
+        score: 0,
+        finishedTime: record.finishedTime,
+        finishedDate: record.finishedDate,
+        answerCount: record.answeredCount,
+        correctRate: record.accuracy,
+        cleanName: record.cleanName,
+        _isLocalQuiz: true
+    });
+
+    // 重新分组
+    data.exerciseHistoryGroup = groupExerciseHistory(data.exerciseHistory);
+
+    // 重新计算热力图
+    data.exerciseHeatMapData = {};
+    data.exerciseHistory.forEach(h => {
+        let v = moment(h.finishedDate).toDate().getTime() / 1000;
+        data.exerciseHeatMapData[v] = (data.exerciseHeatMapData[v] || 0) + (h.answerCount || 0);
+    });
+
+    cache.writeCache(cacheKey, { data }, 30 * 24 * 60 * 60 * 1000);
+    console.log('练习记录同步: 已加入本地题库记录 ' + record.setName);
+}
+
+// 分组函数（与 exercisesResult.js 保持一致）
+function groupExerciseHistory(exerciseHistory) {
+    const _ = require('lodash');
+    return _.groupBy(exerciseHistory, h => {
+        let name = (h.sheet && h.sheet.name) || '';
+        if (h._isLocalQuiz) {
+            h.cleanName = name;
+            return '本地题库';
+        } else if (name.startsWith('专项智能练习')) {
+            h.cleanName = name.replace(/(专项智能练习)（(.*)）/, '$1');
+            return name.replace(/专项智能练习（(.*)）/, '$1');
+        } else if (name.startsWith('每日演练')) {
+            h.cleanName = name;
+            return '每日演练';
+        } else {
+            return 'others';
+        }
+    });
+}
+
+router.get('/quiz-result/:recordId', async ctx => {
+    const record = quizRecord.getRecord(ctx.params.recordId);
+    await ctx.render('quiz-result', {
+        record,
+        backUrl: resolveBackUrl(ctx.query.from)
+    });
+});
+
+// 本地题库结果导出 PDF
+router.post('/api/quiz/export-pdf', async ctx => {
+    try {
+        const { recordId, hideAnswer } = ctx.request.body;
+        const record = quizRecord.getRecord(recordId);
+        if (!record) {
+            ctx.body = { error: '记录不存在' };
+            ctx.status = 404;
+            return;
+        }
+
+        const pdfGenerator = require('./util/pdfGenerator');
+        // 选取错题+疑题作为导出内容
+        const wrongAndFlagged = record.questions.filter(q => q.correct === false || q.flagged);
+
+        if (wrongAndFlagged.length === 0) {
+            ctx.body = { error: '本次练习无错题或疑题，无需导出' };
+            ctx.status = 404;
+            return;
+        }
+
+        // 转换为 pdfGenerator 期望的格式
+        const pdfQuestions = wrongAndFlagged.map(q => ({
+            content: q.stem,
+            options: q.options,
+            correctAnswer: { choice: String(q.options.indexOf(q.answer)), type: 201 },
+            source: record.setName + ' 第' + q.qNo + '题',
+            tags: [],
+            keypoints: [record.source, q.knowledge].filter(Boolean),
+            solution: q.analysis,
+            _myAnswer: q.myAnswer,
+            _flagged: q.flagged
+        }));
+
+        const categoryName = record.setName + (record.flaggedCount > 0 ? ' · 错题+疑题' : ' · 错题集');
+        const pdfBuffer = await pdfGenerator.generateWrongQuestionsPDF({
+            categoryName: categoryName,
+            questions: pdfQuestions,
+            start: 1,
+            end: pdfQuestions.length,
+            hideAnswer: hideAnswer === true
+        });
+
+        const fileName = encodeURIComponent(record.setName + '-错题.pdf');
+        ctx.set('Content-Type', 'application/pdf');
+        ctx.set('Content-Disposition', `inline; filename*=UTF-8''${fileName}`);
+        ctx.body = pdfBuffer;
+    } catch (e) {
+        console.error('本地题库PDF导出失败:', e.message, e.stack);
+        ctx.body = { error: '导出失败: ' + e.message };
+        ctx.status = 500;
+    }
 });
 
 router.get('/history', async ctx => {
@@ -452,10 +811,10 @@ router.post('/api/export-daily-wrong-pdf', async ctx => {
             return;
         }
 
-        const pdfBuffer = await pdfGenerator.generateDailyWrongStatsPDF(stats);
+        const pdfBuffer = await pdfGenerator.generateDailyWrongStatsPDF(stats, { hideAnswer: true });
 
         ctx.set('Content-Type', 'application/pdf');
-        ctx.set('Content-Disposition', `attachment; filename="wrong-stats-${date}.pdf"`);
+        ctx.set('Content-Disposition', `inline; filename="wrong-stats-${date}.pdf"`);
         ctx.body = pdfBuffer;
     } catch (e) {
         console.error('当日错题PDF生成失败:', e.message);

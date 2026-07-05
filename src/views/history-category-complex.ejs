@@ -333,6 +333,7 @@
   <a href="/history">列表视图</a>
   <a href="/wrong-questions">错题本</a>
   <a href="/word-frequency">词语统计</a>
+  <a href="/quiz">本地题库</a>
   <a href="/shenlun-format">公文格式</a>
   <a href="/setup" style="margin-left:auto;">切换账号</a>
 </div>
@@ -409,10 +410,10 @@
           <% if (c1.items && c1.items.length > 0) { %>
           <div class="ex-item-list">
             <% for (let item of c1.items) { %>
-            <div class="ex-row" id="his-<%= item.id %>" onclick="showReport(<%= item.id %>)">
+            <div class="ex-row" id="his-<%= item.id %>" onclick="showReport('<%= item.id %>', <%= !!item._isLocalQuiz %>)">
               <input type="checkbox" class="ex-cb" data-id="<%= item.id %>" onclick="event.stopPropagation()" onchange="updateSelCount(this)">
               <span class="rate"><%= item.correctRate %>%</span>
-              <span class="title" title="<%= item.cleanName %>"><%= item.cleanName %></span>
+              <span class="title" title="<%= item.cleanName %>"><%= item.cleanName %><% if (item._isLocalQuiz) { %> <span style="font-size:10px;color:#0066cc;background:#e6f0ff;padding:1px 6px;border-radius:6px;border:1px solid #b8d4ff;margin-left:4px;">本地</span><% } %></span>
               <span class="meta"><%= item.answerCount %>题</span>
               <span class="date"><%= item.finishedDate %></span>
             </div>
@@ -427,10 +428,10 @@
               <% if (c2.items && c2.items.length > 0) { %>
               <div class="ex-item-list">
                 <% for (let item of c2.items) { %>
-                <div class="ex-row" id="his-<%= item.id %>" onclick="showReport(<%= item.id %>)">
+                <div class="ex-row" id="his-<%= item.id %>" onclick="showReport('<%= item.id %>', <%= !!item._isLocalQuiz %>)">
                   <input type="checkbox" class="ex-cb" data-id="<%= item.id %>" onclick="event.stopPropagation()" onchange="updateSelCount(this)">
                   <span class="rate"><%= item.correctRate %>%</span>
-                  <span class="title" title="<%= item.cleanName %>"><%= item.cleanName %></span>
+                  <span class="title" title="<%= item.cleanName %>"><%= item.cleanName %><% if (item._isLocalQuiz) { %> <span style="font-size:10px;color:#0066cc;background:#e6f0ff;padding:1px 6px;border-radius:6px;border:1px solid #b8d4ff;margin-left:4px;">本地</span><% } %></span>
                   <span class="meta"><%= item.answerCount %>题</span>
                   <span class="date"><%= item.finishedDate %></span>
                 </div>
@@ -445,10 +446,10 @@
                   <% if (c3.items && c3.items.length > 0) { %>
                   <div class="ex-item-list">
                     <% for (let item of c3.items) { %>
-                    <div class="ex-row" id="his-<%= item.id %>" onclick="showReport(<%= item.id %>)">
+                    <div class="ex-row" id="his-<%= item.id %>" onclick="showReport('<%= item.id %>', <%= !!item._isLocalQuiz %>)">
                       <input type="checkbox" class="ex-cb" data-id="<%= item.id %>" onclick="event.stopPropagation()" onchange="updateSelCount(this)">
                       <span class="rate"><%= item.correctRate %>%</span>
-                      <span class="title" title="<%= item.cleanName %>"><%= item.cleanName %></span>
+                      <span class="title" title="<%= item.cleanName %>"><%= item.cleanName %><% if (item._isLocalQuiz) { %> <span style="font-size:10px;color:#0066cc;background:#e6f0ff;padding:1px 6px;border-radius:6px;border:1px solid #b8d4ff;margin-left:4px;">本地</span><% } %></span>
                       <span class="meta"><%= item.answerCount %>题</span>
                       <span class="date"><%= item.finishedDate %></span>
                     </div>
@@ -525,8 +526,12 @@
     }
   }
 
-  function showReport(id) {
-    window.open('/exercise/' + id + '?from=/history-category-complex', '_blank');
+  function showReport(id, isLocalQuiz) {
+    if (isLocalQuiz) {
+      window.open('/quiz-result/' + id + '?from=/history-category-complex', '_blank');
+    } else {
+      window.open('/exercise/' + id + '?from=/history-category-complex', '_blank');
+    }
   }
 
   /* ── 多选导出 ── */

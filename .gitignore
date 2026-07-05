@@ -62,6 +62,11 @@ wrong-question-book/
 # Excel 数据（与 CSV 重复，勿上传）
 *.xlsx
 
+# 本地题库（体积大，不推送）
+【1】片段阅读600题题库/
+【4】红领巾言语理解600题/
+【5】花生逻辑推理600题题库/
+
 # Snowpack dependency directory (https://snowpack.dev/)
 web_modules/
 

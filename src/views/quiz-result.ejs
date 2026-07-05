@@ -1,0 +1,410 @@
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>练习结果 · 粉笔助手</title>
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    body { background: var(--paper); }
+
+    /* ── Hero 区 ── */
+    .page-hero {
+      background:
+        radial-gradient(ellipse at 20% 0%, rgba(0,102,204,0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 100%, rgba(90,155,230,0.04) 0%, transparent 50%);
+      padding: 24px 0 12px;
+      margin: -32px -24px 20px;
+      padding-left: 24px; padding-right: 24px;
+    }
+    .hero-title { font-size: 22px; font-weight: 700; color: var(--text-900); }
+    .hero-sub { font-size: 13px; color: var(--text-500); margin-top: 4px; }
+
+    /* ── 统计卡 ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--card);
+      border: 0.5px solid var(--border-light);
+      border-radius: 12px;
+      padding: 18px 20px;
+      text-align: center;
+    }
+    .stat-card b {
+      display: block;
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--g-700);
+      font-family: var(--font-mono);
+      margin-bottom: 4px;
+    }
+    .stat-card span {
+      font-size: 12px;
+      color: var(--text-ter);
+    }
+    .stat-card.rate-high b { color: #2d6a1e; }
+    .stat-card.rate-mid b { color: #b8860b; }
+    .stat-card.rate-low b { color: #c0392b; }
+
+    /* ── 操作按钮 ── */
+    .actions-bar {
+      display: flex; gap: 10px; flex-wrap: wrap;
+      margin-bottom: 16px;
+      align-items: center;
+    }
+    .action-btn {
+      padding: 10px 20px;
+      border-radius: 10px;
+      border: 0.5px solid var(--border-light);
+      background: var(--card); color: var(--text-sec);
+      font-size: 13px; font-weight: 600;
+      cursor: pointer; text-decoration: none;
+      transition: all 0.2s;
+      font-family: inherit;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .action-btn:hover { border-color: var(--g-400); color: var(--g-700); }
+    .action-btn.primary {
+      background: var(--brand-600, #0066cc); color: #fff;
+      border-color: var(--brand-600, #0066cc);
+    }
+    .action-btn.primary:hover { background: var(--brand-700, #0052a3); }
+    .action-btn.warning {
+      background: #fff5e6; color: #b8860b; border-color: #ffdbb0;
+    }
+    .action-btn.toggle {
+      background: var(--card); color: var(--text-sec);
+    }
+    .action-btn.toggle.active {
+      background: #fef0ee; color: #c0392b; border-color: #c0392b;
+    }
+
+    /* ── 过滤栏 ── */
+    .filter-bar {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 16px;
+      font-size: 13px; color: var(--text-ter);
+    }
+    .filter-bar .filter-count { font-weight: 600; color: var(--g-700); }
+
+    /* ── 题目列表 ── */
+    .q-list { display: flex; flex-direction: column; gap: 12px; }
+    .q-item {
+      background: var(--card);
+      border: 0.5px solid var(--border-light);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .q-item.correct { border-left: 3px solid #2d6a1e; }
+    .q-item.wrong { border-left: 3px solid #c0392b; }
+    .q-item.unanswered { border-left: 3px solid #b8860b; }
+
+    .q-item-head {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 18px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .q-item-head:hover { background: var(--g-50); }
+    .q-no {
+      font-size: 13px; font-weight: 700; color: var(--g-700);
+      background: var(--g-50);
+      padding: 4px 10px; border-radius: 6px;
+      flex-shrink: 0;
+    }
+    .q-status {
+      font-size: 11px; padding: 2px 8px; border-radius: 8px;
+      flex-shrink: 0;
+    }
+    .status-correct { background: #f0f7e8; color: #2d6a1e; }
+    .status-wrong { background: #fef0ee; color: #c0392b; }
+    .status-unanswered { background: #fef9ee; color: #b8860b; }
+    .flag-mark {
+      font-size: 12px; color: #b8860b;
+      flex-shrink: 0;
+    }
+    .q-stem-preview {
+      flex: 1; min-width: 0;
+      font-size: 13px; color: var(--text-sec);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .q-toggle {
+      font-size: 12px; color: var(--text-ter);
+      transition: transform 0.2s;
+    }
+    .q-item.expanded .q-toggle { transform: rotate(180deg); }
+
+    .q-item-body {
+      display: none;
+      padding: 0 18px 18px;
+      border-top: 0.5px solid var(--border-light);
+    }
+    .q-item.expanded .q-item-body { display: block; }
+
+    .q-stem-full {
+      font-size: 14px; line-height: 1.8;
+      color: var(--text-900);
+      padding: 14px 0;
+      white-space: pre-wrap;
+    }
+    .q-image-full {
+      max-width: 100%; margin: 8px 0 14px;
+      border-radius: 8px;
+      border: 0.5px solid var(--border-light);
+    }
+
+    .opts-block { margin-bottom: 14px; }
+    .opt-row {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 14px;
+      border: 0.5px solid var(--border-light);
+      border-radius: 8px;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+    .opt-letter {
+      font-weight: 700; color: var(--g-700);
+      width: 22px; flex-shrink: 0;
+    }
+    .opt-row.opt-correct {
+      background: #f0f7e8; border-color: #2d6a1e;
+      color: #2d6a1e; font-weight: 600;
+    }
+    .opt-row.opt-correct .opt-letter { color: #2d6a1e; }
+    .opt-row.opt-wrong {
+      background: #fef0ee; border-color: #c0392b;
+      color: #c0392b; font-weight: 600;
+    }
+    .opt-row.opt-wrong .opt-letter { color: #c0392b; }
+
+    .answer-line {
+      font-size: 13px; color: var(--text-sec);
+      padding: 8px 0; border-bottom: 0.5px dashed var(--border-light);
+      margin-bottom: 10px;
+    }
+    .answer-line b { color: var(--g-700); }
+
+    .analysis-block {
+      background: #f5f9ff;
+      border-left: 3px solid var(--brand-500, #0066cc);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 13px; line-height: 1.75;
+      color: var(--text-sec);
+      white-space: pre-wrap;
+    }
+    .analysis-title {
+      font-size: 12px; font-weight: 700;
+      color: var(--g-700); margin-bottom: 6px;
+    }
+    .knowledge-tag {
+      display: inline-block;
+      font-size: 11px; padding: 2px 8px; border-radius: 8px;
+      background: var(--brand-50, #e6f0ff); color: var(--brand-600, #0066cc);
+      border: 1px solid var(--brand-100, #b8d4ff);
+      margin-top: 8px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-ter);
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="navbar">
+  <a href="/history-category-complex" class="logo"><img src="/image.png" alt="">粉笔助手</a>
+  <a href="/history-category-complex">练习记录</a>
+  <a href="/history">列表视图</a>
+  <a href="/wrong-questions">错题本</a>
+  <a href="/word-frequency">词语统计</a>
+  <a href="/quiz">本地题库</a>
+  <a href="/shenlun-format">公文格式</a>
+  <a href="/setup" style="margin-left:auto;">切换账号</a>
+</div>
+
+<div class="page-wrap" style="max-width:900px; margin:0 auto; padding:32px 24px 60px;">
+  <% if (!record) { %>
+    <div class="empty-state">未找到该练习记录</div>
+  <% } else { %>
+    <div class="page-hero">
+      <div class="hero-title"><%= record.setName %> · 结果</div>
+      <div class="hero-sub">
+        <%= record.source %> ·
+        <%= record.questionCount %> 题 ·
+        用时 <%= record.durationDesc %> ·
+        <%= record.finishedTime %>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card <%= record.accuracy >= 80 ? 'rate-high' : record.accuracy >= 50 ? 'rate-mid' : 'rate-low' %>">
+        <b><%= record.accuracy %>%</b><span>正确率</span>
+      </div>
+      <div class="stat-card"><b><%= record.correctCount %></b><span>答对</span></div>
+      <div class="stat-card"><b><%= record.wrongCount %></b><span>答错</span></div>
+      <div class="stat-card"><b><%= record.unansweredCount %></b><span>未答</span></div>
+      <div class="stat-card"><b><%= record.flaggedCount %></b><span>疑题</span></div>
+    </div>
+
+    <div class="actions-bar">
+      <a class="action-btn" href="<%= backUrl %>">← 返回</a>
+      <a class="action-btn primary" href="/quiz/<%= record.setId %>">再做一次</a>
+      <button class="action-btn warning" id="exportPdfBtn" onclick="exportPDF()">导出错题 PDF（仅题目）</button>
+      <button class="action-btn toggle" id="filterWrongBtn" onclick="toggleFilterWrong()">只看错题</button>
+      <a class="action-btn" href="/quiz">题库列表</a>
+    </div>
+
+    <div class="filter-bar" id="filterBar" style="display:none;">
+      <span>当前显示：<span class="filter-count" id="filterCount">0</span> / <%= record.questions.length %> 题</span>
+      <a href="javascript:clearFilterWrong()" style="color: var(--brand-600, #0066cc); font-size: 12px;">显示全部</a>
+    </div>
+
+    <div class="q-list">
+      <% for (let i = 0; i < record.questions.length; i++) {
+        let q = record.questions[i];
+        let statusClass = q.correct === true ? 'correct' : (q.correct === false ? 'wrong' : 'unanswered');
+        let statusLabel = q.correct === true ? '答对' : (q.correct === false ? '答错' : '未答');
+        let statusTagClass = q.correct === true ? 'status-correct' : (q.correct === false ? 'status-wrong' : 'status-unanswered');
+      %>
+        <div class="q-item <%= statusClass %>" data-status="<%= statusClass %>" id="qitem-<%= i %>">
+          <div class="q-item-head" onclick="toggleQ(<%= i %>)">
+            <span class="q-no">第<%= i+1 %>题</span>
+            <span class="q-status <%= statusTagClass %>"><%= statusLabel %></span>
+            <% if (q.flagged) { %><span class="flag-mark" title="疑题">★</span><% } %>
+            <span class="q-stem-preview"><%= q.stem.replace(/[\r\n]+/g, ' ').slice(0, 80) %>...</span>
+            <span class="q-toggle">▼</span>
+          </div>
+          <div class="q-item-body">
+            <div class="q-stem-full"><%= q.stem %></div>
+            <% if (q.imageUrl) { %>
+              <img class="q-image-full" src="<%= q.imageUrl %>" alt="" onerror="this.style.display='none'">
+            <% } %>
+
+            <div class="opts-block">
+              <% for (let j = 0; j < q.options.length; j++) {
+                let L = ['A','B','C','D','E','F'][j];
+                let cls = 'opt-row';
+                if (L === q.answer) cls += ' opt-correct';
+                else if (L === q.myAnswer && q.myAnswer !== q.answer) cls += ' opt-wrong';
+              %>
+                <div class="<%= cls %>">
+                  <span class="opt-letter"><%= L %>.</span>
+                  <span><%= q.options[j] %></span>
+                </div>
+              <% } %>
+            </div>
+
+            <div class="answer-line">
+              我的答案：<b><%= q.myAnswer || '未作答' %></b>
+             　 正确答案：<b><%= q.answer %></b>
+            </div>
+
+            <div class="analysis-block">
+              <div class="analysis-title">解析</div>
+              <%= q.analysis %>
+            </div>
+            <% if (q.knowledge) { %>
+              <span class="knowledge-tag"><%= q.knowledge %></span>
+            <% } %>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  <% } %>
+</div>
+
+<script>
+var RECORD_ID = '<%= record ? record.recordId : "" %>';
+var filterWrongMode = false;
+
+function toggleQ(idx) {
+  var el = document.getElementById('qitem-' + idx);
+  el.classList.toggle('expanded');
+}
+
+// 展开所有错题和疑题
+(function autoExpandWrong() {
+  document.querySelectorAll('.q-item.wrong, .q-item.unanswered').forEach(function(el) {
+    el.classList.add('expanded');
+  });
+})();
+
+// 只看错题切换
+function toggleFilterWrong() {
+  filterWrongMode = !filterWrongMode;
+  var btn = document.getElementById('filterWrongBtn');
+  var bar = document.getElementById('filterBar');
+  if (filterWrongMode) {
+    btn.classList.add('active');
+    btn.innerText = '显示全部';
+    applyFilterWrong();
+    bar.style.display = 'flex';
+  } else {
+    btn.classList.remove('active');
+    btn.innerText = '只看错题';
+    clearFilterWrong();
+  }
+}
+
+function applyFilterWrong() {
+  var items = document.querySelectorAll('.q-item');
+  var shown = 0;
+  items.forEach(function(el) {
+    var st = el.getAttribute('data-status');
+    if (st === 'wrong' || st === 'unanswered') {
+      el.style.display = '';
+      shown++;
+    } else {
+      el.style.display = 'none';
+    }
+  });
+  document.getElementById('filterCount').textContent = shown;
+}
+
+function clearFilterWrong() {
+  filterWrongMode = false;
+  var btn = document.getElementById('filterWrongBtn');
+  var bar = document.getElementById('filterBar');
+  btn.classList.remove('active');
+  btn.innerText = '只看错题';
+  bar.style.display = 'none';
+  document.querySelectorAll('.q-item').forEach(function(el) {
+    el.style.display = '';
+  });
+}
+
+function exportPDF() {
+  var btn = document.getElementById('exportPdfBtn');
+  var orig = btn.innerText;
+  btn.disabled = true;
+  btn.innerText = '生成中...';
+  fetch('/api/quiz/export-pdf', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ recordId: RECORD_ID, hideAnswer: true })
+  })
+  .then(function(r) {
+    if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || '导出失败'); });
+    return r.blob();
+  })
+  .then(function(blob) {
+    var url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(function() { URL.revokeObjectURL(url); }, 60000);
+  })
+  .catch(function(e) { alert('导出失败：' + e.message); })
+  .finally(function() {
+    btn.disabled = false;
+    btn.innerText = orig;
+  });
+}
+</script>
+</body>
+</html>

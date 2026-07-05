@@ -61,6 +61,18 @@
 - 格式分类标注：完整格式（标题+称谓+正文+落款）/ 不完整格式 / 特殊格式（如简报报头报尾、编者按等）
 - 顶部格式要素说明卡，统一讲解标题、主送机关、正文、落款书写规范
 
+### 本地题库刷题
+- 内置 **2 个题库共 1036 道题**：片段阅读 436 题（22 套）+ 花生逻辑推理 600 题（30 套）
+- 题库以 xlsx 文件存储于项目根目录，启动时由 `quizLoader.js` 加载到内存
+- **做题页**：单题展示、选项点击作答（支持 4/6 选项）、顶部进度条、总计时器、上一题/下一题/题号导航点
+- **标记疑题**：每题可标记为疑题，提交时单独统计
+- **自动判分**：提交后后端对照答案统计对错，生成练习记录
+- **结果页**：正确率/答对/答错/未答/疑题统计卡、题目列表（对错高亮+疑题标记）、解析展开、PDF 导出
+- **同步练习记录**：做题记录自动写入 `exercise_history.json`，在列表视图和分类聚合页显示"本地题库"标签
+- **同步错题本**：错题自动写入 `wrong_q_local_quiz.json`，兼容现有错题本格式
+- **PDF 导出**：结果页一键导出错题+疑题为 PDF（复用 pdfGenerator）
+- **逻辑推理图片**：支持渲染题目图片（imageUrl 字段）
+
 ### 登录与认证
 - 支持粉笔网账号密码登录（含图形验证码）
 - Cookie 本地缓存，自动续期
@@ -70,7 +82,7 @@
 - **后端**：Node.js + Koa 2 + Koa-Router + koa-ejs（服务端渲染）
 - **模板**：EJS（`cache: false`，动态页面禁用浏览器缓存）
 - **PDF 生成**：PDFKit
-- **工具库**：lodash、moment、percentile、qs
+- **工具库**：lodash、moment、percentile、qs、xlsx（本地题库加载）
 - **图表**：ECharts（前端）
 - **HTTP**：request
 - **字体**：simhei.ttf / msyh.ttc / CascadiaMono.ttf / SimSun.ttf（PDF 中文支持）
@@ -88,7 +100,9 @@ fenbi-helper-master/
 │   │   ├── cacheUtil.js           # 本地 JSON 文件缓存
 │   │   ├── httpUtil.js            # 粉笔 API 请求封装
 │   │   ├── idiomDict.js           # 成语词典加载（CSV → 内存 Map）
-│   │   └── pdfGenerator.js        # 错题本 PDF 生成器
+│   │   ├── pdfGenerator.js        # 错题本 PDF 生成器
+│   │   ├── quizLoader.js          # 本地题库加载（xlsx → 内存）
+│   │   └── quizRecord.js          # 本地题库练习记录管理
 │   └── views/
 │       ├── exerciseResult.ejs     # 练习报告详情页
 │       ├── history-category-complex.ejs  # 分类聚合历史页（首页）
@@ -101,12 +115,17 @@ fenbi-helper-master/
 │       ├── search.ejs            # 搜索页
 │       ├── calc.ejs              # 计算器页
 │       ├── shenlun-format.ejs    # 申论公文格式页
+│       ├── quiz-list.ejs         # 本地题库选择页
+│       ├── quiz-play.ejs         # 本地题库做题页
+│       ├── quiz-result.ejs       # 本地题库结果页
 │       ├── setup.ejs             # 登录页
 │       ├── theme.css             # 全局主题
 │       └── js/                   # 前端静态资源（echarts、easymde 等）
 ├── fonts/                         # PDF 中文字体
 ├── fenbi-helper-design/          # 设计稿
 ├── cache/                        # 本地缓存（已 gitignore，含敏感数据）
+├── 【1】片段阅读600题题库/         # 片段阅读题库（22 套 xlsx，436 题）
+├── 【5】花生逻辑推理600题题库/     # 逻辑推理题库（30 套 xlsx，600 题）
 ├── 言语成语表_结构化.csv           # 成语词典数据源（598 条）
 ├── Dockerfile
 └── package.json
@@ -145,9 +164,13 @@ node src/app.js
 | `/wrong-questions` | 错题本 |
 | `/word-frequency` | 词语频次统计 |
 | `/shenlun-format` | 申论公文格式速查 |
+| `/quiz` | 本地题库选择页 |
+| `/quiz/:setId` | 本地题库做题页 |
+| `/quiz-result/:recordId` | 本地题库结果页 |
 | `/setup` | 登录页 |
 | `/api/wrong-questions/pdf` | 导出错题本 PDF |
 | `/api/exercises/export-pdf` | 按练习记录批量导出错题/未写题目 PDF |
+| `/api/quiz/export-pdf` | 本地题库结果导出 PDF（错题+疑题） |
 | `/api/export-daily-wrong-pdf` | 按日期导出当日错题 PDF（含词语统计页） |
 | `/api/word-frequency/refresh` | 手动刷新词语统计缓存 |
 | `/api/wrong-questions-by-ids` | 按 ID 批量获取题目详情 |
@@ -182,6 +205,7 @@ docker run -d -p 3000:3000 -v $(pwd)/cache:/app/cache fenbi-helper
 
 ## 历史更新
 
+- **2026-07-05** 新增本地题库刷题模块：内置片段阅读 436 题 + 逻辑推理 600 题共 1036 题；做题页支持单题作答、总计时器、标记疑题、题号导航；结果页含对错高亮、疑题标记、解析展开；做题记录自动同步至练习记录列表和分类聚合页（"本地题库"标签）；错题自动同步至错题本；结果页支持一键导出错题+疑题 PDF
 - **2026-07-04** 新增申论公文格式模块（33 文种，三级卡片式浏览，含格式示意）；练习记录按 id 去重（修复跨分类重复）；练习记录多选导出错题/未写题目 PDF；热力图与分类模块滚动条优化；视频解析非会员容错（无视频自动隐藏按钮不报错）；导航栏统一补齐列表视图
 - **2026-07-03** 成语词典 CSV 集成；词语统计缓存策略（15 天 + 手动更新）；错题词语关联卡片重设计；正确答案高亮；页面返回逻辑（从哪来回哪去）；PDF 排版优化（智能选项布局、绝对 Y 坐标）
 - **2026-07-02** 词语统计数据源切换为全错题本数据；按钮配色与 PDF 样式优化；新增每日演练数据拉取；分类树与历史记录聚合重构

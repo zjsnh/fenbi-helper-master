@@ -347,7 +347,8 @@ function renderStemWithImages(doc, segments, startX, startY, maxWidth, fontSize,
 // ══════════════════════════════════════
 //  渲染一道题（粉笔风格排版 + 智能选项布局）
 // ══════════════════════════════════════
-function renderQuestion(doc, q, num) {
+function renderQuestion(doc, q, num, opts2) {
+  const hideAnswer = opts2 && opts2.hideAnswer === true;
   const text = stripHtml(q.content || '', true);  // keepImages=true：保留图片标记
   const stemSegments = parseSegments(text);
   const opts = (q.options || []).map((o, j) => ({
@@ -438,7 +439,7 @@ function renderQuestion(doc, q, num) {
     doc.y = cy;
     gPageNum++;
     gTotalPages++;
-    return renderQuestion(doc, q, num);
+    return renderQuestion(doc, q, num, opts2);
   }
 
   // ── 4. 绘制题号 + 题干（含内联/块状图） ──
@@ -498,6 +499,93 @@ function renderQuestion(doc, q, num) {
     }
   }
 
+  // ── 6. 答案 + 解析 + 知识点（可选，仅当题目携带这些字段时渲染）──
+  // 规范化正确答案为字母
+  function normAns(ans) {
+    if (ans == null) return null;
+    if (typeof ans === 'object') ans = ans.choice;
+    if (ans === 'A' || ans === 'B' || ans === 'C' || ans === 'D' || ans === 'E' || ans === 'F') return ans;
+    var n = parseInt(ans, 10);
+    if (!isNaN(n) && n >= 0 && n <= 5) return 'ABCDEF'[n];
+    return null;
+  }
+  var correctLetter = normAns(q.correctAnswer);
+  var myLetter = normAns(q.myAnswer || q._myAnswer);
+  var hasAnswerInfo = correctLetter || myLetter;
+  var solutionText = q.solution ? stripHtml(String(q.solution), false).trim() : '';
+  var keypoints = (q.keypoints || []).filter(Boolean);
+  var flagged = q._flagged === true;
+  var hasExtra = hasAnswerInfo || solutionText || keypoints.length > 0;
+
+  if (hasExtra && !hideAnswer) {
+    // 分页检查（粗估高度）
+    var extraH = 6; // 答案行
+    if (solutionText) extraH += estimateLines(solutionText, BODY_W - 8, FOOTER_SIZE) * (LINE_HEIGHT - 3) + 8;
+    if (keypoints.length > 0) extraH += 14;
+    if (doc.y + extraH > PAGE_H - MARGIN_B - 10) {
+      drawFooter(doc);
+      doc.addPage();
+      doc.rect(0, 0, PAGE_W, PAGE_H).fill(BG);
+      var ny2 = drawHeader(doc, false, '', '');
+      doc.y = ny2;
+      gPageNum++;
+      gTotalPages++;
+    }
+
+    // 答案行
+    if (hasAnswerInfo) {
+      doc.y += 3;
+      var ansY = doc.y;
+      doc.font(f).fontSize(FOOTER_SIZE);
+      var ansText = '正确答案: ' + (correctLetter || '—');
+      if (myLetter) {
+        ansText += '    我的答案: ' + myLetter;
+        if (correctLetter && myLetter !== correctLetter) ansText += ' (错)';
+      }
+      doc.fillColor(correctLetter ? '#2d6a1e' : FOOTER_C);
+      doc.text(ansText, MARGIN_L, ansY, { width: BODY_W, lineBreak: false });
+      if (flagged) {
+        doc.fillColor('#b8860b');
+        doc.text('★ 疑题', MARGIN_L + BODY_W - 60, ansY, { width: 60, align: 'right', lineBreak: false });
+      }
+      doc.y = ansY + (LINE_HEIGHT - 3);
+    }
+
+    // 解析
+    if (solutionText) {
+      doc.y += 4;
+      var solY = doc.y;
+      doc.font(f).fontSize(FOOTER_SIZE).fillColor('#0066cc');
+      doc.text('解析', MARGIN_L, solY, { width: BODY_W, lineBreak: false });
+      doc.y = solY + (LINE_HEIGHT - 3);
+      doc.fillColor(FOOTER_C);
+      var solLines = estimateLines(solutionText, BODY_W - 8, FOOTER_SIZE);
+      // 简单分页
+      if (doc.y + solLines * (LINE_HEIGHT - 3) > PAGE_H - MARGIN_B - 10) {
+        drawFooter(doc);
+        doc.addPage();
+        doc.rect(0, 0, PAGE_W, PAGE_H).fill(BG);
+        var ny3 = drawHeader(doc, false, '', '');
+        doc.y = ny3;
+        gPageNum++;
+        gTotalPages++;
+      }
+      doc.text(solutionText, MARGIN_L, doc.y, {
+        width: BODY_W - 8,
+        lineGap: (LINE_HEIGHT - 3) - FOOTER_SIZE,
+      });
+      doc.y += solLines * (LINE_HEIGHT - 3) + 2;
+    }
+
+    // 知识点
+    if (keypoints.length > 0) {
+      doc.y += 3;
+      doc.font(f).fontSize(FOOTER_SIZE - 1).fillColor('#0066cc');
+      doc.text('[' + keypoints.join(' · ') + ']', MARGIN_L, doc.y, { width: BODY_W, lineBreak: false });
+      doc.y += (LINE_HEIGHT - 3);
+    }
+  }
+
   // 题间距
   doc.y += Q_GAP;
 }
@@ -506,7 +594,7 @@ function renderQuestion(doc, q, num) {
 //  主入口
 // ══════════════════════════════════════
 async function generateWrongQuestionsPDF(options) {
-  const { categoryName, questions, start, end } = options;
+  const { categoryName, questions, start, end, hideAnswer } = options;
   const selected = questions.slice(start - 1, end);
   gCategoryName = categoryName;
   gPageNum = 1;
@@ -556,7 +644,7 @@ async function generateWrongQuestionsPDF(options) {
         gPageNum++;
         gTotalPages++;
       }
-      renderQuestion(doc, q, start + i);
+      renderQuestion(doc, q, start + i, { hideAnswer: hideAnswer });
     });
 
     drawFooter(doc);
@@ -637,8 +725,9 @@ function renderWordStatsPage(doc, wordStatsList) {
 // ══════════════════════════════════════
 //  按日期生成当日错题统计报告
 // ══════════════════════════════════════
-async function generateDailyWrongStatsPDF(stats) {
+async function generateDailyWrongStatsPDF(stats, options) {
   const { date, questions, wordStatsList } = stats;
+  const hideAnswer = options && options.hideAnswer === true;
   gCategoryName = date + ' 错题';
   gPageNum = 1;
   gTotalPages = 1;
@@ -686,7 +775,7 @@ async function generateDailyWrongStatsPDF(stats) {
         gPageNum++;
         gTotalPages++;
       }
-      renderQuestion(doc, q, i + 1);
+      renderQuestion(doc, q, i + 1, { hideAnswer: hideAnswer });
     });
 
     if (wordStatsList && wordStatsList.length > 0) {

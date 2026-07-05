@@ -814,6 +814,33 @@ exports.getDailyWrongStats = async function (date, cookie) {
     let wrongQuestionIds = [];
     for (let item of dayItems) {
         try {
+            // 本地题库记录：从 quiz_records 缓存读取，不调用在线 API
+            if (item._isLocalQuiz) {
+                const quizRecord = require('../util/quizRecord');
+                const rec = quizRecord.getRecord(item.id);
+                if (!rec || !rec.questions) continue;
+                rec.questions.forEach(q => {
+                    if (q.correct === false) {
+                        const qid = 'local_' + (q.uid || q.qNo);
+                        if (seenIds.has(qid)) return;
+                        seenIds.add(qid);
+                        wrongQuestions.push({
+                            questionId: qid,
+                            content: q.stem,
+                            options: q.options,
+                            correctAnswer: { choice: q.answer, type: 201 },
+                            difficulty: 3,
+                            source: rec.setName + ' 第' + q.qNo + '题',
+                            tags: [],
+                            keypoints: [rec.source, q.knowledge].filter(Boolean),
+                            solution: q.analysis,
+                            myAnswer: q.myAnswer,
+                            cost: null
+                        });
+                    }
+                });
+                continue;
+            }
             let obj = await exports.getResultObj(item.id, 70, cookie);
             if (!obj || !obj.concernQuestions) continue;
             obj.concernQuestions.forEach(q => {
