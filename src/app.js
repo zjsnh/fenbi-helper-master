@@ -10,6 +10,7 @@ const serve = require('koa-static');
 const path = require('path');
 const qs = require('qs');
 const url = require('url');
+const fs = require('fs');
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
@@ -32,7 +33,12 @@ render(app, {
 app.use(serve(__dirname + '/views/js'))
 app.use(serve(__dirname + '/views'))
 
-app.use(koaBody())
+app.use(koaBody({
+    multipart: true,
+    formidable: {
+        maxFileSize: 200 * 1024 * 1024
+    }
+}))
 
 // 动态页面禁止浏览器缓存，确保数据始终最新
 app.use(async (ctx, next) => {
@@ -202,11 +208,34 @@ router.get('/quiz', async ctx => {
         const totalQ = sets.reduce((sum, s) => sum + s.questionCount, 0);
         totalQuestions += totalQ;
         totalSets += sets.length;
-        sources.push({ name: sourceName, sets, totalQ });
+        sources.push({ name: sourceName, sets, totalQ, uploaded: quizLoader.isUploadedSource(sourceName) });
     });
 
     await ctx.render('quiz-list', {
         sources, totalSets, totalQuestions, totalAnswered
+    });
+});
+
+// 自定义出题：从多个题套聚合题目，支持随机抽取指定数量
+// 注意：此路由必须在 /quiz/:setId 之前注册，否则 custom 会被当作 setId 参数
+router.get('/quiz/custom', async ctx => {
+    const setIdsStr = ctx.query.setIds || '';
+    const count = ctx.query.count ? parseInt(ctx.query.count) : null;
+    const setIds = setIdsStr.split(',').map(s => s.trim()).filter(Boolean);
+    if (setIds.length === 0) {
+        ctx.redirect('/quiz');
+        return;
+    }
+    const customSet = await quizLoader.buildCustomSet(setIds, count);
+    if (!customSet) {
+        ctx.redirect('/quiz');
+        return;
+    }
+    await ctx.render('quiz-play', {
+        setId: customSet.setId,
+        setName: customSet.setName,
+        source: customSet.source,
+        questions: customSet.questions
     });
 });
 
@@ -243,8 +272,17 @@ router.post('/quiz/:setId/submit', async ctx => {
 
     // 判分
     let correctCount = 0, wrongCount = 0, unansweredCount = 0;
+    const isMulti = (t) => /多(选|项)/.test(String(t));
+    const normMulti = (s) => {
+        const letters = String(s || '').toUpperCase().match(/[A-F]/g) || [];
+        return Array.from(new Set(letters)).sort().join('');
+    };
     const questions = set.questions.map(q => {
-        const myAnswer = answers[q.qNo] || '';
+        let myAnswer = answers[q.qNo] || '';
+        // 多选题：用户答案排序后再比较
+        if (isMulti(q.type)) {
+            myAnswer = normMulti(myAnswer);
+        }
         let correct;
         if (!myAnswer) {
             unansweredCount++;
@@ -423,6 +461,10 @@ function syncToExerciseHistory(record) {
             chapters: [],
             questionIds: []
         },
+        // 本地题库扩展字段：用于列表视图显示「题库名称 + 题目数量」
+        source: record.source || '',
+        setId: record.setId || '',
+        setName: record.setName || '',
         questionCount: record.questionCount,
         correctCount: record.correctCount,
         score: 0,
@@ -474,6 +516,113 @@ router.get('/quiz-result/:recordId', async ctx => {
         record,
         backUrl: resolveBackUrl(ctx.query.from)
     });
+});
+
+// 上传本地题库文件夹
+router.post('/api/quiz/upload-folder', async ctx => {
+    try {
+        const filesObj = ctx.request.files || {};
+        // 取 field 名为 files 的文件列表
+        let fileList = filesObj.files || filesObj['files'] || [];
+        if (!Array.isArray(fileList)) fileList = [fileList];
+
+        const source = (ctx.request.body.source || '').trim();
+        const folderNameRaw = (ctx.request.body.folderName || '').trim();
+
+        if (fileList.length === 0) {
+            ctx.body = { code: 400, message: '未收到任何文件，请选择包含 xlsx 或 apkg 的文件夹' };
+            return;
+        }
+
+        // 仅保留目标扩展名文件
+        const validFiles = fileList.filter(f => {
+            const n = (f.name || '').toLowerCase();
+            return n.endsWith('.xlsx') || n.endsWith('.apkg');
+        });
+        if (validFiles.length === 0) {
+            ctx.body = { code: 400, message: '文件夹内未发现 .xlsx 或 .apkg 文件' };
+            return;
+        }
+
+        // 检测主扩展名（取数量多的那种）
+        const xlsxCount = validFiles.filter(f => f.name.toLowerCase().endsWith('.xlsx')).length;
+        const apkgCount = validFiles.length - xlsxCount;
+        const ext = xlsxCount >= apkgCount ? 'xlsx' : 'apkg';
+
+        // 过滤出对应扩展名的文件（混合时只取主类型，其余忽略）
+        const targetFiles = validFiles.filter(f => f.name.toLowerCase().endsWith('.' + ext));
+
+        // 磁盘文件夹名：优先使用原始文件夹名，其次用 source
+        const sanitize = s => s.replace(/[\\/:*?"<>|]/g, '_').trim() || '题库';
+        const folderName = sanitize(folderNameRaw || source || '上传题库');
+        const uploadDir = path.join(__dirname, '..', 'uploaded-quizzes', folderName);
+        fs.mkdirSync(uploadDir, { recursive: true });
+
+        // 保存文件
+        const savedNames = [];
+        for (const f of targetFiles) {
+            const baseName = path.basename(f.name);
+            const target = path.join(uploadDir, baseName);
+            // 路径已由 folderName 唯一化，无需再处理重名
+            fs.copyFileSync(f.path, target);
+            savedNames.push(baseName);
+        }
+
+        // 注册到动态配置并重新加载题库
+        const displaySource = source || folderNameRaw || folderName;
+        const cfg = quizLoader.addUploadedConfig(folderName, displaySource, ext);
+        await quizLoader.reload();
+
+        ctx.body = {
+            code: 0,
+            message: '上传成功，已加载 ' + savedNames.length + ' 个 ' + ext + ' 文件',
+            data: {
+                source: cfg.source,
+                prefix: cfg.prefix,
+                ext: cfg.ext,
+                fileCount: savedNames.length,
+                files: savedNames
+            }
+        };
+    } catch (err) {
+        console.error('[upload-folder] 失败:', err.message, err.stack);
+        ctx.status = 500;
+        ctx.body = { code: 500, message: '上传失败: ' + err.message };
+    }
+});
+
+// 卸载上传的题库（按 source 删除）
+router.post('/api/quiz/uninstall', async ctx => {
+    try {
+        const { source } = ctx.request.body;
+        if (!source) {
+            ctx.body = { code: 400, message: '缺少 source 参数' };
+            return;
+        }
+        // 查找对应动态配置
+        const configs = quizLoader.loadDynamicConfigs();
+        const cfg = configs.find(c => c.source === source);
+        if (!cfg) {
+            ctx.body = { code: 404, message: '未找到该题库配置，可能为内置题库，无法卸载' };
+            return;
+        }
+        // 从配置中提取文件夹名（dir 形如 uploaded-quizzes/xxx）
+        const folderName = path.basename(cfg.dir);
+        // 删除磁盘文件
+        const dirPath = path.join(__dirname, '..', cfg.dir);
+        if (fs.existsSync(dirPath)) {
+            fs.rmSync(dirPath, { recursive: true, force: true });
+        }
+        // 删除动态配置
+        quizLoader.removeUploadedConfig(folderName);
+        // 重新加载
+        await quizLoader.reload();
+        ctx.body = { code: 0, message: '已卸载题库：' + source };
+    } catch (err) {
+        console.error('[uninstall] 失败:', err.message, err.stack);
+        ctx.status = 500;
+        ctx.body = { code: 500, message: '卸载失败: ' + err.message };
+    }
 });
 
 // 本地题库结果导出 PDF
@@ -536,6 +685,34 @@ router.get('/history', async ctx => {
         ctx.redirect('/setup');
     } else {
         let data = await exerciseResult.getExerciseHistory(cookie, false);
+        // 本地题库记录回填一级题库名（source）
+        // 旧缓存记录可能没有 source/setId 字段，需多路径回填
+        await quizLoader.loadAll();
+        // 从 quiz_records 构建反查映射：recordId -> { setId, source }
+        const localRecords = quizRecord.readAll();
+        const recMap = {};
+        localRecords.forEach(r => { recMap[r.recordId || r.id] = r; });
+        data.exerciseHistory.forEach(h => {
+            if (!h._isLocalQuiz) return;
+            // 路径1：记录自带 source
+            if (h.source) return;
+            // 路径2：通过 setId 反查 setsMap
+            if (h.setId) {
+                const src = quizLoader.getSourceBySetIdSync(h.setId);
+                if (src) { h.source = src; return; }
+            }
+            // 路径3：通过 recordId 反查 quiz_records
+            const rec = recMap[h.id];
+            if (rec) {
+                if (rec.source) { h.source = rec.source; h.setId = h.setId || rec.setId; return; }
+                if (rec.setId) {
+                    const src2 = quizLoader.getSourceBySetIdSync(rec.setId);
+                    if (src2) { h.source = src2; h.setId = rec.setId; return; }
+                }
+            }
+            // 兜底
+            h.source = (h.sheet && h.sheet.name) ? h.sheet.name : '本地题库';
+        });
         // 按日期分组
         let grouped = {};
         let total = 0;

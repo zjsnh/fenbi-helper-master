@@ -391,15 +391,28 @@ function renderQuestion(dir) {
 
   html += '<div class="q-options">';
   var letters = ['A','B','C','D','E','F'];
+  var isMulti = /多(选|项)/.test(String(q.type));
+  // 当前已选字母（多选存数组，单选存字符串）
+  var curAns = answers[q.qNo];
   for (var i = 0; i < q.options.length; i++) {
     var L = letters[i];
-    var sel = answers[q.qNo] === L ? ' selected' : '';
+    var sel = '';
+    if (isMulti) {
+      if (curAns && curAns.indexOf(L) >= 0) sel = ' selected';
+    } else {
+      if (curAns === L) sel = ' selected';
+    }
     html += '<div class="opt-item' + sel + '" onclick="choose(\'' + L + '\')">';
     html += '<div class="opt-letter">' + L + '</div>';
     html += '<div class="opt-text">' + escapeHtml(q.options[i]) + '</div>';
     html += '</div>';
   }
   html += '</div>';
+
+  // 多选题提示
+  if (isMulti) {
+    html += '<div style="margin-top:12px;font-size:12px;color:var(--text-ter);">多选题：可选择多个选项，选完点击「下一题」继续</div>';
+  }
 
   var card = document.getElementById('qCard');
   card.innerHTML = html;
@@ -434,16 +447,35 @@ function escapeAttr(s) {
 
 function choose(letter) {
   var q = QUESTIONS[curIdx];
-  if (answers[q.qNo] === letter) {
-    // 再次点击取消选择
-    delete answers[q.qNo];
+  var isMulti = /多(选|项)/.test(String(q.type));
+
+  if (isMulti) {
+    // 多选题：切换选中状态，不自动跳转
+    var cur = answers[q.qNo] || '';
+    if (cur.indexOf(letter) >= 0) {
+      // 取消选择
+      cur = cur.replace(letter, '');
+      if (cur) answers[q.qNo] = cur;
+      else delete answers[q.qNo];
+    } else {
+      // 追加选择
+      cur = cur + letter;
+      // 排序便于显示一致
+      answers[q.qNo] = cur.split('').sort().join('');
+    }
     renderQuestion();
   } else {
-    answers[q.qNo] = letter;
-    renderQuestion();
-    // 选择后自动跳转下一题（最后一题不跳）
-    if (curIdx < QUESTIONS.length - 1) {
-      setTimeout(function() { goNext(); }, 300);
+    // 单选题：保持原逻辑
+    if (answers[q.qNo] === letter) {
+      delete answers[q.qNo];
+      renderQuestion();
+    } else {
+      answers[q.qNo] = letter;
+      renderQuestion();
+      // 选择后自动跳转下一题（最后一题不跳）
+      if (curIdx < QUESTIONS.length - 1) {
+        setTimeout(function() { goNext(); }, 300);
+      }
     }
   }
 }

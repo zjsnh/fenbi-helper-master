@@ -67,6 +67,9 @@ wrong-question-book/
 【4】红领巾言语理解600题/
 【5】花生逻辑推理600题题库/
 
+# 上传的题库文件（用户数据，不推送）
+uploaded-quizzes/
+
 # Snowpack dependency directory (https://snowpack.dev/)
 web_modules/
 

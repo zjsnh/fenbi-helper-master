@@ -7,6 +7,10 @@ let initSqlJs;
 
 const ROOT = path.join(__dirname, '..', '..');
 
+// 上传题库存放根目录（相对项目根）
+const UPLOADED_BASE = 'uploaded-quizzes';
+const UPLOADED_CONFIG_FILE = path.join(ROOT, UPLOADED_BASE, 'config.json');
+
 // 题库目录配置（source 用完整文件夹名作为分类标题）
 // ext: 文件扩展名（xlsx / apkg）
 const QUIZ_DIRS = [
@@ -14,6 +18,54 @@ const QUIZ_DIRS = [
   { dir: '【5】花生逻辑推理600题题库', source: '【5】花生逻辑推理600题题库', prefix: 'lr', ext: 'xlsx' },
   { dir: '【4】红领巾言语理解600题', source: '【4】红领巾言语理解600题', prefix: 'hlj', ext: 'apkg' }
 ];
+
+// 读取上传题库的动态配置
+function loadDynamicConfigs() {
+  if (!fs.existsSync(UPLOADED_CONFIG_FILE)) return [];
+  try {
+    return JSON.parse(fs.readFileSync(UPLOADED_CONFIG_FILE, 'utf-8'));
+  } catch (e) {
+    console.log('[quizLoader] 读取动态配置失败: ' + e.message);
+    return [];
+  }
+}
+
+// 保存上传题库的动态配置
+function saveDynamicConfigs(configs) {
+  const configDir = path.join(ROOT, UPLOADED_BASE);
+  if (!fs.existsSync(configDir)) fs.mkdirSync(configDir, { recursive: true });
+  fs.writeFileSync(UPLOADED_CONFIG_FILE, JSON.stringify(configs, null, 2));
+}
+
+// 生成不重复的 prefix（u001 / u002 ...）
+function generatePrefix(configs) {
+  let max = 0;
+  configs.forEach(c => {
+    const m = String(c.prefix).match(/^u(\d+)$/);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  });
+  return 'u' + String(max + 1).padStart(3, '0');
+}
+
+// 注册一个上传题库文件夹，返回生成的配置
+// 同 source 的记录会更新（保留原 prefix），避免重复累积
+function addUploadedConfig(folderName, source, ext) {
+  const configs = loadDynamicConfigs();
+  const dirPath = path.join(UPLOADED_BASE, folderName);
+  const existing = configs.find(c => c.source === source);
+  if (existing) {
+    // 更新目录与扩展名，保留 prefix
+    existing.dir = dirPath;
+    existing.ext = ext;
+    saveDynamicConfigs(configs);
+    return existing;
+  }
+  const prefix = generatePrefix(configs);
+  const cfg = { dir: dirPath, source, prefix, ext };
+  configs.push(cfg);
+  saveDynamicConfigs(configs);
+  return cfg;
+}
 
 // 内存中的题套列表
 // setId -> { setId, source, setName, sheetName, questions: [...] }
@@ -23,8 +75,10 @@ const setsMap = new Map();
 const questionIndex = new Map();
 
 function naturalSort(a, b) {
-  const na = parseInt(String(a).match(/\d+/g).join(''), 10);
-  const nb = parseInt(String(b).match(/\d+/g).join(''), 10);
+  const ma = String(a).match(/\d+/g);
+  const mb = String(b).match(/\d+/g);
+  const na = ma ? parseInt(ma.join(''), 10) : 0;
+  const nb = mb ? parseInt(mb.join(''), 10) : 0;
   return na - nb;
 }
 
@@ -60,20 +114,26 @@ function parseQuestion(row, header, source, setId, qNo) {
   // 题干
   const stem = get('题干') || get('题目') || '';
 
-  // 答案规范化为字母字符串
+  // 题型（先取，用于判断多选）
+  const type = get('题型') || '单选';
+
+  // 答案规范化：多选题保留全部字母并排序，单选题仅取首字母
   let answer = String(get('答案') || '').trim().toUpperCase();
-  // 仅保留第一个字母
-  const m = answer.match(/[A-F]/);
-  answer = m ? m[0] : '';
+  if (/多(选|项)/.test(type)) {
+    // 保留所有 A-F 字母，去重并排序
+    const letters = answer.match(/[A-F]/g) || [];
+    const uniq = Array.from(new Set(letters)).sort();
+    answer = uniq.join('');
+  } else {
+    const m = answer.match(/[A-F]/);
+    answer = m ? m[0] : '';
+  }
 
   // 解析
   const analysis = get('解析') || '';
 
   // 知识点
   const knowledge = get('知识点') || '';
-
-  // 题型（仅逻辑推理有）
-  const type = get('题型') || '单选';
 
   // 图片URL（仅逻辑推理有）
   let imageUrl = get('图片URL') || '';
@@ -200,9 +260,18 @@ function parseApkgFile(filePath, source) {
       const qNoStr = (parts[1] || '').trim();
       const stem = (parts[2] || '').trim();
       const optionsRaw = parts[3] || '';
-      const answer = (parts[4] || '').trim().toUpperCase().substring(0, 1);
       const analysis = parts[5] || '';
       const knowledge = parts[6] || '';
+      // 多选题保留全部字母，单选题取首字母
+      let answer;
+      const rawAnswer = (parts[4] || '').trim().toUpperCase();
+      if (/多(选|项)/.test(type)) {
+        const letters = rawAnswer.match(/[A-F]/g) || [];
+        answer = Array.from(new Set(letters)).sort().join('');
+      } else {
+        const m = rawAnswer.match(/[A-F]/);
+        answer = m ? m[0] : '';
+      }
 
       // 选项拆分：格式 "A. xxx<br>B. yyy<br>C. zzz<br>D. www"
       const options = [];
@@ -238,8 +307,12 @@ async function loadAll() {
   if (setsMap.size > 0) return; // 已加载
   console.log('[quizLoader] 开始加载题库...');
 
+  // 合并静态配置 + 动态配置（上传的题库）
+  const dynamicConfigs = loadDynamicConfigs();
+  const allConfigs = QUIZ_DIRS.concat(dynamicConfigs);
+
   // 初始化 sql.js（用于解析 apkg）
-  const hasApkg = QUIZ_DIRS.some(c => c.ext === 'apkg');
+  const hasApkg = allConfigs.some(c => c.ext === 'apkg');
   if (hasApkg && !global._sqlJsReady) {
     const initSqlJs = require('sql.js');
     const SQL = await initSqlJs();
@@ -248,8 +321,33 @@ async function loadAll() {
     console.log('[quizLoader] sql.js 初始化完成');
   }
 
-  QUIZ_DIRS.forEach(loadDir);
-  console.log('[quizLoader] 加载完成，共 ' + setsMap.size + ' 套题，' + questionIndex.size + ' 道题');
+  allConfigs.forEach(loadDir);
+  console.log('[quizLoader] 加载完成，共 ' + setsMap.size + ' 套题，' + questionIndex.size + ' 道题，动态配置 ' + dynamicConfigs.length + ' 个');
+}
+
+// 清空内存数据并重新加载（上传新题库后调用）
+async function reload() {
+  setsMap.clear();
+  questionIndex.clear();
+  await loadAll();
+}
+
+// 按文件夹名删除一个上传题库的动态配置（不删磁盘文件，由调用方处理）
+function removeUploadedConfig(folderName) {
+  const configs = loadDynamicConfigs();
+  const dirPath = path.join(UPLOADED_BASE, folderName);
+  const idx = configs.findIndex(c => c.dir === dirPath);
+  if (idx < 0) return null;
+  const removed = configs[idx];
+  configs.splice(idx, 1);
+  saveDynamicConfigs(configs);
+  return removed;
+}
+
+// 判断某个 source 是否为上传题库（动态配置）
+function isUploadedSource(source) {
+  const configs = loadDynamicConfigs();
+  return configs.some(c => c.source === source);
 }
 
 // 列出所有题套，按来源分组
@@ -271,8 +369,22 @@ async function listSets() {
 }
 
 // 获取某套题完整内容（含题目）
+// 支持普通题套与自定义题集（custom_ 前缀）
 async function getSet(setId) {
   await loadAll();
+  // 自定义题集
+  if (String(setId).indexOf('custom_') === 0) {
+    const c = customSetsMap.get(setId);
+    if (!c) return null;
+    return {
+      setId: c.setId,
+      source: c.source,
+      setName: c.setName,
+      sheetName: 'custom',
+      questionCount: c.questions.length,
+      questions: c.questions
+    };
+  }
   const s = setsMap.get(setId);
   if (!s) return null;
   return {
@@ -285,6 +397,57 @@ async function getSet(setId) {
   };
 }
 
+// 自定义题集内存缓存：customSetId -> { setId, source, setName, questions }
+const customSetsMap = new Map();
+
+// 从多个题套聚合题目，生成自定义题集
+// setIds: 题套 ID 数组；count: 抽取数量（null/0 = 全部）
+async function buildCustomSet(setIds, count) {
+  await loadAll();
+  const allQuestions = [];
+  const sourceNames = [];
+  setIds.forEach(id => {
+    const s = setsMap.get(id);
+    if (!s) return;
+    if (sourceNames.indexOf(s.source) < 0) sourceNames.push(s.source);
+    s.questions.forEach(q => allQuestions.push(Object.assign({}, q)));
+  });
+
+  if (allQuestions.length === 0) return null;
+
+  // 随机抽取
+  let picked = allQuestions;
+  if (count && count > 0 && count < allQuestions.length) {
+    // Fisher-Yates 随机抽样
+    const arr = allQuestions.slice();
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+    }
+    picked = arr.slice(0, count);
+  }
+
+  // 重新编号
+  const customId = 'custom_' + Date.now();
+  picked.forEach((q, i) => {
+    q.setId = customId;
+    q.qNo = i + 1;
+    q.uid = customId + '_q' + (i + 1);
+  });
+
+  const setName = '自定义练习(' + picked.length + '题)';
+  const source = sourceNames.length > 0 ? sourceNames.join(' + ') : '自定义';
+
+  const customSet = {
+    setId: customId,
+    source,
+    setName,
+    questions: picked
+  };
+  customSetsMap.set(customId, customSet);
+  return customSet;
+}
+
 // 获取单题
 async function getQuestion(uid) {
   await loadAll();
@@ -295,4 +458,11 @@ async function getQuestion(uid) {
   return s.questions[meta.qNo - 1] || null;
 }
 
-module.exports = { loadAll, listSets, getSet, getQuestion };
+// 同步反查：通过 setId 获取一级题库名（source）
+// 必须在 loadAll 完成后调用，否则 setsMap 为空
+function getSourceBySetIdSync(setId) {
+  const s = setsMap.get(setId);
+  return s ? s.source : '';
+}
+
+module.exports = { loadAll, listSets, getSet, getQuestion, reload, addUploadedConfig, loadDynamicConfigs, removeUploadedConfig, isUploadedSource, buildCustomSet, getSourceBySetIdSync };

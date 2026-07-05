@@ -194,7 +194,6 @@
       padding: 12px 16px;
       font-size: 13px; line-height: 1.75;
       color: var(--text-sec);
-      white-space: pre-wrap;
     }
     .analysis-title {
       font-size: 12px; font-weight: 700;
@@ -308,7 +307,7 @@
 
             <div class="analysis-block">
               <div class="analysis-title">解析</div>
-              <%= q.analysis %>
+              <%- (q.analysis || '').replace(/\s+/g, ' ').trim() %>
             </div>
             <% if (q.knowledge) { %>
               <span class="knowledge-tag"><%= q.knowledge %></span>
