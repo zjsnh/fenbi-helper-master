@@ -271,7 +271,12 @@ router.del('/api/collect/:questionId', async ctx => {
 router.get('/api/video/:questionId', async ctx => {
     let questionId = ctx.params.questionId;
     let cookie = ctx.request.headers['cookie'];
-    ctx.body = await exerciseResult.getVideoUrl(questionId, cookie);
+    try {
+        ctx.body = await exerciseResult.getVideoUrl(questionId, cookie);
+    } catch (e) {
+        console.error('视频解析获取失败:', e.message);
+        ctx.body = null;
+    }
 });
 
 router.get('/api/comment/:questionId', async ctx => {
@@ -451,6 +456,56 @@ router.post('/api/export-daily-wrong-pdf', async ctx => {
     } catch (e) {
         console.error('当日错题PDF生成失败:', e.message);
         ctx.body = { error: 'PDF生成失败: ' + e.message };
+        ctx.status = 500;
+    }
+});
+
+// 按练习记录批量导出错题/未写题目 PDF
+router.post('/api/exercises/export-pdf', async ctx => {
+    let cookie = ctx.request.headers['cookie'];
+    if (!cookie || !cookie.includes('userid')) {
+        ctx.body = { error: '请先登录' };
+        ctx.status = 401;
+        return;
+    }
+    try {
+        const { exerciseIds, type, moduleName } = ctx.request.body;
+        if (!exerciseIds || !Array.isArray(exerciseIds) || exerciseIds.length === 0) {
+            ctx.body = { error: '请至少选择一个练习' };
+            ctx.status = 400;
+            return;
+        }
+        if (type !== 'wrong' && type !== 'unanswered') {
+            ctx.body = { error: '类型参数无效' };
+            ctx.status = 400;
+            return;
+        }
+
+        console.log('练习导出PDF: type=' + type + ', exerciseIds=' + exerciseIds.join(',') + ', module=' + moduleName);
+        const questions = await exerciseResult.getQuestionsByExerciseIds(exerciseIds, type, cookie);
+
+        if (!questions || questions.length === 0) {
+            ctx.body = { error: type === 'wrong' ? '所选练习中没有错题' : '所选练习中没有未写题目' };
+            ctx.status = 404;
+            return;
+        }
+
+        const pdfGenerator = require('./util/pdfGenerator');
+        const categoryName = (moduleName || '') + (type === 'wrong' ? ' · 错题集' : ' · 未写题目');
+        const pdfBuffer = await pdfGenerator.generateWrongQuestionsPDF({
+            categoryName: categoryName,
+            questions: questions,
+            start: 1,
+            end: questions.length
+        });
+
+        const fileName = encodeURIComponent((moduleName || '练习') + (type === 'wrong' ? '-错题' : '-未写') + '.pdf');
+        ctx.set('Content-Type', 'application/pdf');
+        ctx.set('Content-Disposition', `attachment; filename*=UTF-8''${fileName}`);
+        ctx.body = pdfBuffer;
+    } catch (e) {
+        console.error('练习导出PDF失败:', e.message, e.stack);
+        ctx.body = { error: '导出失败: ' + e.message };
         ctx.status = 500;
     }
 });

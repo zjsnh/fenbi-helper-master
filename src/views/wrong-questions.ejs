@@ -345,65 +345,6 @@
       border: 0.5px solid var(--g-100);
     }
 
-    /* ── 搜索栏 ── */
-    .wq-search-bar {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 24px;
-      animation: fadeUp 0.5s var(--ease-decel) 0.1s both;
-    }
-    .wq-search-bar .wq-search-input {
-      flex: 1;
-      padding: 12px 20px 12px 44px;
-      font-size: 15px;
-      border-radius: var(--radius);
-      border: 2px solid var(--border);
-      background: var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E") 14px center no-repeat;
-      transition: all 0.3s var(--ease-out);
-      box-shadow: var(--shadow-xs);
-      outline: none;
-      font-family: inherit;
-    }
-    .wq-search-bar .wq-search-input:focus {
-      border-color: var(--g-400);
-      box-shadow: 0 0 0 4px rgba(0,102,204,0.12), var(--shadow-sm);
-    }
-    .wq-search-bar .wq-search-clear {
-      display: none;
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      border: none;
-      background: var(--ink-100);
-      color: var(--ink-500);
-      font-size: 16px;
-      cursor: pointer;
-      transition: all 0.2s;
-      flex-shrink: 0;
-    }
-    .wq-search-bar .wq-search-clear:hover {
-      background: var(--ink-200);
-      color: var(--ink-700);
-    }
-    .wq-search-bar .wq-search-clear.visible { display: flex; align-items: center; justify-content: center; }
-    .wq-search-hint {
-      font-size: 12px;
-      color: var(--text-ter);
-      margin-top: -16px;
-      margin-bottom: 20px;
-      padding-left: 4px;
-    }
-
-    /* 搜索结果高亮 */
-    .cat-card .cat-name mark {
-      background: var(--g-200);
-      color: var(--g-800);
-      font-weight: 700;
-      border-radius: 3px;
-      padding: 0 2px;
-    }
-
     .empty-hint {
       text-align: center;
       padding: 80px 20px;
@@ -748,14 +689,7 @@
     </div>
   </div>
 
-  <!-- 搜索栏 -->
-  <div class="wq-search-bar">
-    <input class="wq-search-input" id="wqSearchInput" type="text" placeholder="按分类名称搜索错题..." autocomplete="off">
-    <button class="wq-search-clear" id="wqSearchClear" title="清除搜索">&#x2715;</button>
-  </div>
-  <div class="wq-search-hint" id="wqSearchHint">输入关键词模糊匹配分类名称，实时筛选</div>
-
-  <!-- 面包屑 -->
+  <!-- 分类网格主容器 -->
   <div class="breadcrumb" id="breadcrumb">
     <span class="crumb current">全部分类</span>
   </div>
@@ -808,120 +742,6 @@
     container.innerHTML = html;
     document.getElementById('cat-count').textContent = nodes.length;
   }
-
-  // ── 模糊搜索逻辑 ──
-  var searchTimer = null;
-
-  // 将分类树扁平化为所有节点列表（含完整路径）
-  function flattenCategories(nodes, parentPath) {
-    var result = [];
-    if (!nodes) return result;
-    nodes.forEach(function(node) {
-      var fullPath = parentPath ? (parentPath + ' > ' + node.name) : node.name;
-      result.push({
-        id: node.id,
-        name: node.name,
-        fullPath: fullPath,
-        count: node.count,
-        hasChildren: !!(node.children && node.children.length > 0),
-        children: node.children || []
-      });
-      if (node.children && node.children.length > 0) {
-        result = result.concat(flattenCategories(node.children, fullPath));
-      }
-    });
-    return result;
-  }
-
-  // 高亮匹配文字
-  function highlightText(text, keyword) {
-    if (!keyword) return text;
-    var escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    var regex = new RegExp('(' + escaped + ')', 'gi');
-    return text.replace(regex, '<mark>$1</mark>');
-  }
-
-  // 执行搜索
-  function doSearch(keyword) {
-    var clearBtn = document.getElementById('wqSearchClear');
-    var hint = document.getElementById('wqSearchHint');
-    var container = document.getElementById('main-content');
-    var breadcrumb = document.getElementById('breadcrumb');
-
-    if (!keyword || !keyword.trim()) {
-      clearBtn.classList.remove('visible');
-      hint.textContent = '输入关键词模糊匹配分类名称，实时筛选';
-      breadcrumb.style.display = '';
-      goHome();
-      return;
-    }
-
-    clearBtn.classList.add('visible');
-    breadcrumb.style.display = 'none';
-
-    var kw = keyword.trim().toLowerCase();
-    var allNodes = flattenCategories(CATEGORIES, '');
-
-    // 模糊匹配：节点名称或完整路径包含关键词
-    var matched = allNodes.filter(function(node) {
-      return node.name.toLowerCase().indexOf(kw) !== -1
-          || node.fullPath.toLowerCase().indexOf(kw) !== -1;
-    });
-
-    hint.textContent = '找到 ' + matched.length + ' 个匹配分类';
-
-    if (matched.length === 0) {
-      container.innerHTML = '<div class="empty-hint"><div style="font-size:48px;opacity:0.3;margin-bottom:20px;">&#x1F50D;</div>未找到与「' + escapeHtml(keyword.trim()) + '」匹配的分类</div>';
-      return;
-    }
-
-    var html = '<div class="cat-grid stagger">';
-    matched.forEach(function(node, idx) {
-      html += '<div class="cat-card" style="animation-delay:' + (idx * 0.05) + 's" data-node=\'' + JSON.stringify({
-        id: node.id,
-        name: node.name,
-        count: node.count,
-        hasChildren: node.hasChildren
-      }) + '\' onclick="handleCardClick(this)">';
-      html += '<div class="cat-name">' + highlightText(node.name, keyword.trim()) + '</div>';
-      html += '<div class="cat-count">' + node.count + '</div>';
-      html += '<div class="cat-sub" style="font-size:10px;color:var(--ink-400);">' + highlightText(node.fullPath, keyword.trim()) + '</div>';
-      if (node.count > 0) {
-        html += '<div class="cat-actions">';
-        html += '<button class="cat-export-btn" onclick="event.stopPropagation();quickExport(' + node.id + ', \'' + escapeHtml(node.name) + '\', ' + node.count + ')">导出 PDF</button>';
-        html += '</div>';
-      }
-      html += '</div>';
-    });
-    html += '</div>';
-    container.innerHTML = html;
-    document.getElementById('cat-count').textContent = matched.length;
-  }
-
-  // 绑定搜索事件
-  var wqSearchInput = document.getElementById('wqSearchInput');
-  var wqSearchClear = document.getElementById('wqSearchClear');
-
-  wqSearchInput.addEventListener('input', function() {
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(function() {
-      doSearch(wqSearchInput.value);
-    }, 200);
-  });
-
-  wqSearchInput.addEventListener('keydown', function(e) {
-    if (e.keyCode === 13) {
-      clearTimeout(searchTimer);
-      doSearch(wqSearchInput.value);
-    }
-  });
-
-  wqSearchClear.addEventListener('click', function() {
-    wqSearchInput.value = '';
-    wqSearchClear.classList.remove('visible');
-    doSearch('');
-    wqSearchInput.focus();
-  });
 
   function handleCardClick(el) {
     var data = JSON.parse(el.getAttribute('data-node'));

@@ -1,9 +1,20 @@
 const PDFDocument = require('pdfkit');
 const path = require('path');
+const https = require('https');
+const http = require('http');
+const zlib = require('zlib');
 
 const FONT_PATH = path.join(__dirname, '..', '..', 'fonts', 'simhei.ttf');
 // TODO: 如需更接近粉笔原版（方正书宋），可替换为 simsun.ttf
 const FONT_SONG_PATH = path.join(__dirname, '..', '..', 'fonts', 'simsun.ttf');
+
+// ── 图片缓存：url → Buffer ──
+const imageCache = new Map();
+
+// ── 图片标记字符（Private Use Area，不会与正常文本冲突）──
+const IMG_MARK_START = '\uE000';
+const IMG_MARK_SEP   = '\uE001';
+const IMG_MARK_END   = '\uE002';
 
 // ── 页面（与粉笔 PDF 一致） ──
 const PAGE_W  = 595.28;
@@ -105,14 +116,252 @@ function estimateLines(s, colWidth, fontSize) {
 }
 
 // ══════════════════════════════════════
+//  图片处理：解析标签、下载、获取尺寸
+// ══════════════════════════════════════
+function parseImgTags(html) {
+  if (!html) return [];
+  const imgs = [];
+  const regex = /<img\s+([^>]*?)\/?>/gi;
+  let m;
+  while ((m = regex.exec(html)) !== null) {
+    const attrs = m[1] || '';
+    const flagMatch = attrs.match(/flag\s*=\s*"([^"]*)"/i);
+    const srcMatch = attrs.match(/src\s*=\s*"([^"]*)"/i) || attrs.match(/src\s*=\s*'([^']*)'/i);
+    const widthMatch = attrs.match(/width\s*=\s*"?(\d+)/i);
+    const heightMatch = attrs.match(/height\s*=\s*"?(\d+)/i);
+    if (srcMatch) {
+      let url = srcMatch[1];
+      if (url.startsWith('//')) url = 'https:' + url;
+      imgs.push({
+        url,
+        flag: flagMatch ? flagMatch[1] : '',
+        width: widthMatch ? parseInt(widthMatch[1]) : null,
+        height: heightMatch ? parseInt(heightMatch[1]) : null,
+      });
+    }
+  }
+  return imgs;
+}
+
+function downloadImage(url) {
+  return new Promise((resolve) => {
+    if (imageCache.has(url)) { resolve(imageCache.get(url)); return; }
+    const mod = url.startsWith('https') ? https : http;
+    const req = mod.get(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://tiku.fenbi.com/' },
+      timeout: 15000,
+    }, (res) => {
+      if (res.statusCode !== 200) {
+        res.resume();
+        imageCache.set(url, null);
+        resolve(null);
+        return;
+      }
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        let buf = Buffer.concat(chunks);
+        // 处理压缩响应：fb.fenbike.cn 对 ?width=700 强制返回 br 压缩
+        const enc = (res.headers['content-encoding'] || '').toLowerCase();
+        try {
+          if (enc.includes('br')) buf = zlib.brotliDecompressSync(buf);
+          else if (enc.includes('gzip')) buf = zlib.gunzipSync(buf);
+          else if (enc.includes('deflate')) buf = zlib.inflateSync(buf);
+        } catch (e) {
+          console.log(`[PDF] 解压失败 ${url}: ${e.message}`);
+          imageCache.set(url, null);
+          resolve(null);
+          return;
+        }
+        imageCache.set(url, buf);
+        resolve(buf);
+      });
+    });
+    req.on('error', () => { imageCache.set(url, null); resolve(null); });
+    req.on('timeout', () => { req.destroy(); imageCache.set(url, null); resolve(null); });
+  });
+}
+
+async function prefetchImages(questions) {
+  const urls = new Set();
+  questions.forEach(q => {
+    const all = (q.content || '') + '\n' + (q.options || []).join('\n');
+    parseImgTags(all).forEach(img => urls.add(img.url));
+  });
+  if (urls.size === 0) return;
+  console.log(`[PDF] 预下载 ${urls.size} 张图片...`);
+  await Promise.all(Array.from(urls).map(url => downloadImage(url)));
+  const ok = Array.from(urls).filter(u => imageCache.get(u)).length;
+  console.log(`[PDF] 图片下载完成: ${ok}/${urls.size} 成功`);
+}
+
+// 从图片 Buffer 读取原始尺寸（支持 PNG/JPEG/GIF）
+function getImageDimensions(buf) {
+  if (!buf || buf.length < 8) return null;
+  // PNG
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) {
+    return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+  }
+  // GIF
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46) {
+    return { width: buf.readUInt16LE(6), height: buf.readUInt16LE(8) };
+  }
+  // JPEG：扫描 SOF 标记
+  if (buf[0] === 0xFF && buf[1] === 0xD8) {
+    let i = 2;
+    while (i < buf.length - 8) {
+      if (buf[i] !== 0xFF) { i++; continue; }
+      const marker = buf[i + 1];
+      if (marker === 0xC0 || marker === 0xC1 || marker === 0xC2) {
+        return { width: buf.readUInt16BE(i + 7), height: buf.readUInt16BE(i + 5) };
+      }
+      if (marker === 0xD9 || marker === 0xDA) break;
+      const len = buf.readUInt16BE(i + 2);
+      i += 2 + len;
+    }
+  }
+  return null;
+}
+
+// 将带图片标记的文本拆分为 segments
+function parseSegments(text) {
+  const segments = [];
+  const regex = /\uE000([TB])\uE001([^\uE002]+)\uE002/g;
+  let lastIdx = 0;
+  let m;
+  while ((m = regex.exec(text)) !== null) {
+    if (m.index > lastIdx) {
+      segments.push({ type: 'text', text: text.slice(lastIdx, m.index) });
+    }
+    segments.push({ type: 'img', flag: m[1], url: m[2] });
+    lastIdx = regex.lastIndex;
+  }
+  if (lastIdx < text.length) {
+    segments.push({ type: 'text', text: text.slice(lastIdx) });
+  }
+  return segments;
+}
+
+// 渲染题干（支持内联 tex 公式图 + 块状图）
+function renderStemWithImages(doc, segments, startX, startY, maxWidth, fontSize, lineHeight) {
+  const f = zhFont();
+
+  // ── 调试：进入函数时打印 segment 概览 ──
+  const imgSegs = segments.filter(s => s.type === 'img');
+  if (imgSegs.length > 0) {
+    console.log(`[renderStem] segments=${segments.length}, imgs=${imgSegs.length}`);
+    imgSegs.forEach((s, i) => {
+      const buf = imageCache.get(s.url);
+      const dims = buf ? getImageDimensions(buf) : null;
+      console.log(`  [img#${i}] flag=${s.flag} url=${s.url}`);
+      console.log(`           cache=${buf ? buf.length + 'B' : 'MISS'} dims=${dims ? dims.width + 'x' + dims.height : 'null'}`);
+    });
+  }
+
+  // 无图片：直接走原路径
+  if (segments.length === 1 && segments[0].type === 'text') {
+    doc.font(f).fontSize(fontSize).fillColor(TEXT);
+    doc.text(segments[0].text, startX, startY, {
+      width: maxWidth,
+      lineGap: lineHeight - fontSize,
+    });
+    return;
+  }
+
+  let currentX = startX;
+  let currentY = startY;
+
+  segments.forEach((seg) => {
+    if (seg.type === 'text') {
+      if (!seg.text) return;
+      doc.font(f).fontSize(fontSize).fillColor(TEXT);
+      const remainingW = maxWidth - (currentX - startX);
+      if (remainingW <= 0) {
+        currentY += lineHeight;
+        currentX = startX;
+      }
+      doc.text(seg.text, currentX, currentY, {
+        width: maxWidth - (currentX - startX),
+        lineGap: lineHeight - fontSize,
+      });
+      currentX = doc.x;
+      currentY = doc.y;
+    } else if (seg.type === 'img') {
+      const buf = imageCache.get(seg.url);
+      if (!buf) {
+        console.log(`  [renderStem] SKIP: cache MISS for ${seg.url}`);
+        return;
+      }
+
+      if (seg.flag === 'T') {
+        // 内联公式图：高度与字号一致，与文字同基线
+        const dims = getImageDimensions(buf);
+        if (!dims) {
+          console.log(`  [renderStem] SKIP: dims null for ${seg.url}`);
+          return;
+        }
+        const imgH = fontSize + 2;
+        const imgW = imgH * (dims.width / dims.height);
+        // 当前行放不下则换行
+        if (currentX + imgW > startX + maxWidth) {
+          currentY = doc.y + lineHeight;
+          currentX = startX;
+        }
+        // 与文字基线对齐（doc.y 是文本底部，往上偏移 fontSize）
+        const imgY = (doc.y || currentY) - fontSize - 1;
+        try {
+          doc.image(buf, currentX, imgY, { height: imgH });
+          currentX += imgW;
+          console.log(`  [renderStem] OK inline: x=${currentX.toFixed(1)} y=${imgY.toFixed(1)} w=${imgW.toFixed(1)} h=${imgH}`);
+        } catch (e) {
+          console.log(`  [renderStem] FAIL inline: ${e.message} url=${seg.url}`);
+        }
+      } else {
+        // 块状图：新行、居中、按页面宽度自适应
+        try {
+          const dims = getImageDimensions(buf);
+          if (!dims) {
+            console.log(`  [renderStem] SKIP block: dims null for ${seg.url}`);
+            return;
+          }
+          const imgW = Math.min(dims.width, maxWidth);
+          const imgH = dims.height * (imgW / dims.width);
+          if (currentX > startX + 1) {
+            currentY = (doc.y || currentY) + lineHeight;
+            currentX = startX;
+          }
+          const imgX = startX + (maxWidth - imgW) / 2;
+          doc.image(buf, imgX, currentY, { width: imgW, height: imgH });
+          console.log(`  [renderStem] OK block: x=${imgX.toFixed(1)} y=${currentY.toFixed(1)} w=${imgW.toFixed(1)} h=${imgH.toFixed(1)}`);
+          currentY += imgH + 4;
+          currentX = startX;
+          doc.y = currentY;
+        } catch (e) {
+          console.log(`  [renderStem] FAIL block: ${e.message} url=${seg.url}`);
+        }
+      }
+    }
+  });
+}
+
+// ══════════════════════════════════════
 //  渲染一道题（粉笔风格排版 + 智能选项布局）
 // ══════════════════════════════════════
 function renderQuestion(doc, q, num) {
-  const text = stripHtml(q.content || '');
+  const text = stripHtml(q.content || '', true);  // keepImages=true：保留图片标记
+  const stemSegments = parseSegments(text);
   const opts = (q.options || []).map((o, j) => ({
     l: ['A', 'B', 'C', 'D', 'E', 'F'][j],
-    t: stripHtml(o || ''),
+    t: stripHtml(o || '', false),  // 选项不嵌图，直接剥离
   }));
+
+  // ── 调试：检测含图片的题目 ──
+  const imgCount = stemSegments.filter(s => s.type === 'img').length;
+  if (/img\s/i.test(q.content || '') || imgCount > 0) {
+    console.log(`\n[Q${num}] 检测到图片题目`);
+    console.log(`  content 长度=${(q.content || '').length}, 选项数=${opts.length}`);
+    console.log(`  segments=${stemSegments.length}, 图片段=${imgCount}`);
+  }
 
   const f = zhFont();
 
@@ -147,10 +396,26 @@ function renderQuestion(doc, q, num) {
   const optTextW = colW - LABEL_W;            // 选项文本可用宽度
   const rows = Math.ceil(opts.length / cols);
 
-  // 题干行数
+  // 题干行数（用纯文本估算，不含图片标记）
   const stemNumW = num < 10 ? 15 : 23;
-  const stemLines = estimateLines(text, BODY_W - stemNumW, FONT_SIZE);
+  const stemTextOnly = text.replace(/\uE000[^\uE002]*\uE002/g, '');
+  const stemLines = estimateLines(stemTextOnly, BODY_W - stemNumW, FONT_SIZE);
   const stemH = stemLines * LINE_HEIGHT;
+
+  // 块状图额外占的高度
+  const blockImgs = stemSegments.filter(s => s.type === 'img' && s.flag !== 'T');
+  let blockImgH = 0;
+  blockImgs.forEach(seg => {
+    const buf = imageCache.get(seg.url);
+    if (!buf) return;
+    const dims = getImageDimensions(buf);
+    if (dims) {
+      const w = Math.min(dims.width, BODY_W - stemNumW);
+      blockImgH += (dims.height * w / dims.width) + 4;
+    } else {
+      blockImgH += 60;
+    }
+  });
 
   // 选项总高度（按行计算，每行取该行最大行数）
   let optH = 0;
@@ -162,7 +427,7 @@ function renderQuestion(doc, q, num) {
     optH += maxLines * LINE_HEIGHT;
   }
 
-  const estH = stemH + Q_OPT_GAP + optH + Q_GAP;
+  const estH = stemH + blockImgH + Q_OPT_GAP + optH + Q_GAP;
 
   // ── 3. 分页检查（整题预估） ──
   if (doc.y + estH > PAGE_H - MARGIN_B - 10) {
@@ -176,15 +441,12 @@ function renderQuestion(doc, q, num) {
     return renderQuestion(doc, q, num);
   }
 
-  // ── 4. 绘制题号 + 题干 ──
+  // ── 4. 绘制题号 + 题干（含内联/块状图） ──
   const startY = doc.y;
   const numStr = String(num) + '.';
   doc.font(f).fontSize(FONT_SIZE).fillColor(TEXT);
   doc.text(numStr, MARGIN_L, startY, { width: stemNumW, align: 'left', lineBreak: false });
-  doc.text(text, MARGIN_L + stemNumW, startY, {
-    width: BODY_W - stemNumW,
-    lineGap: LINE_HEIGHT - FONT_SIZE,
-  });
+  renderStemWithImages(doc, stemSegments, MARGIN_L + stemNumW, startY, BODY_W - stemNumW, FONT_SIZE, LINE_HEIGHT);
 
   // ── 5. 绘制选项（横向布局，绝对定位） ──
   if (opts.length > 0) {
@@ -250,6 +512,9 @@ async function generateWrongQuestionsPDF(options) {
   gPageNum = 1;
   gTotalPages = 1;
   gQCount = selected.length;
+
+  // 预下载所有图片（公式图、资料图等）
+  await prefetchImages(selected);
 
   const d = new Date();
   const dateStr = d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
@@ -379,6 +644,9 @@ async function generateDailyWrongStatsPDF(stats) {
   gTotalPages = 1;
   gQCount = questions.length;
 
+  // 预下载所有图片
+  await prefetchImages(questions);
+
   const d = new Date();
   const dateStr = d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
 
@@ -433,13 +701,30 @@ async function generateDailyWrongStatsPDF(stats) {
 // ══════════════════════════════════════
 //  HTML 清理
 // ══════════════════════════════════════
-function stripHtml(h) {
+function stripHtml(h, keepImages) {
   if (!h) return '';
-  return h.replace(/<br\s*\/?>/gi, '\n')
+  let s = h.replace(/<br\s*\/?>/gi, '\n')
     .replace(/<input[^>]*>/gi, '___')
     .replace(/<\/?(p|div|tr|h\d|li|ul|ol|table|tbody|thead|th|td|section|article|header|footer|figure|figcaption|textarea|select|button|span|label|form|fieldset|legend|pre|code|blockquote|caption|colgroup|col)[^>]*>/gi, '\n')
-    .replace(/<li[^>]*>/gi, '  \u2022 ').replace(/<img[^>]*\/?>/gi, '')
-    .replace(/<u[^>]*>([\s\u00a0]*)<\/u>/gi, function(m, inner) {
+    .replace(/<li[^>]*>/gi, '  \u2022 ');
+
+  // 处理 <img>：保留为标记 or 直接剥离
+  if (keepImages) {
+    s = s.replace(/<img\s+([^>]*?)\/?>/gi, function(match, attrs) {
+      const srcMatch = attrs.match(/src\s*=\s*"([^"]*)"/i) || attrs.match(/src\s*=\s*'([^']*)'/i);
+      const flagMatch = attrs.match(/flag\s*=\s*"([^"]*)"/i);
+      if (!srcMatch) return '';
+      let url = srcMatch[1];
+      if (url.startsWith('//')) url = 'https:' + url;
+      const flag = flagMatch ? flagMatch[1] : '';
+      // 标记格式：\uE000 + (T|B) + \uE001 + url + \uE002
+      return IMG_MARK_START + (flag === 'tex' ? 'T' : 'B') + IMG_MARK_SEP + url + IMG_MARK_END;
+    });
+  } else {
+    s = s.replace(/<img[^>]*\/?>/gi, '');
+  }
+
+  s = s.replace(/<u[^>]*>([\s\u00a0]*)<\/u>/gi, function(m, inner) {
       return '___'.repeat(Math.max(1, Math.ceil(inner.length / 4)));
     })
     .replace(/<u[^>]*>/gi, '\u0332').replace(/<\/u>/gi, '\u0332')
@@ -461,6 +746,7 @@ function stripHtml(h) {
     .replace(/_{2,}/g, m => m)
     .replace(/\s{2,}/g, ' ').replace(/\n{3,}/g, '\n\n')
     .replace(/^\s+|\s+$/g, '');
+  return s;
 }
 
 module.exports = { generateWrongQuestionsPDF, generateDailyWrongStatsPDF };

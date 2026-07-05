@@ -246,16 +246,21 @@ async function getSolutionsByIds(questionIds, cookie) {
 exports.getSolutionsByIds = getSolutionsByIds;
 
 async function getEpisodesByIds(questionIds, cookie) {
-    let result = await httpRequest({
-        url: `https://ke.fenbi.com/api/gwy/v3/episodes/tiku_episodes_with_multi_type?tiku_ids=${questionIds.join(',')}&tiku_prefix=xingce&tiku_type=5`,
-        method: "GET",
-        json: true,
-        headers: {
-            ...headers,
-            cookie
-        }
-    });
-    return result.data;
+    try {
+        let result = await httpRequest({
+            url: `https://ke.fenbi.com/api/gwy/v3/episodes/tiku_episodes_with_multi_type?tiku_ids=${questionIds.join(',')}&tiku_prefix=xingce&tiku_type=5`,
+            method: "GET",
+            json: true,
+            headers: {
+                ...headers,
+                cookie
+            }
+        });
+        return (result && result.data) || {};
+    } catch (e) {
+        console.error('getEpisodesByIds 失败:', e.message);
+        return {};
+    }
 }
 
 function parseWordListFromNote2(content) {
@@ -383,6 +388,13 @@ exports.getExerciseHistory = async function (cookie, forceRefresh) {
     ]);
     let historyLists = result.filter(r => r.status === 'fulfilled' && r.value).map(r => r.value);
     let exerciseHistory = _.orderBy(_.flatMap(historyLists, _.identity), ['updatedTime'], ['desc']);
+    // 按id去重：同一练习可能同时归属多个分类，合并后会出现重复
+    let _seenIds = new Set();
+    exerciseHistory = exerciseHistory.filter(h => {
+        if (_seenIds.has(h.id)) return false;
+        _seenIds.add(h.id);
+        return true;
+    });
 
     // 使用 Promise.allSettled 容错：单个报告请求失败不影响整体
     let reportResults = await Promise.allSettled(exerciseHistory.map(item => getExerciseReport(item.id, cookie)));
@@ -865,8 +877,9 @@ exports.delCollect = async function (questionId, cookie) {
 }
 
 exports.getVideoUrl = async function (questionId, cookie) {
-    let episodeMap = await getEpisodesByIds([questionId]);
-    if (episodeMap[questionId]) {
+    try {
+        let episodeMap = await getEpisodesByIds([questionId], cookie);
+        if (!episodeMap || !episodeMap[questionId]) return null;
         let videoResult = await httpRequest({
             url: `https://ke.fenbi.com/api/gwy/v3/episodes/${episodeMap[questionId][0].id}/mediafile/meta`,
             method: "GET",
@@ -878,10 +891,10 @@ exports.getVideoUrl = async function (questionId, cookie) {
         });
         if (videoResult && videoResult.datas && videoResult.datas.length > 0) {
             return _.orderBy(videoResult.datas, ['realSize'], ['desc'])[0].url;
-        } else {
-            return null;
         }
-    } else {
+        return null;
+    } catch (e) {
+        console.error('getVideoUrl 失败:', e.message);
         return null;
     }
 }
@@ -1297,4 +1310,80 @@ exports.getSearchModules = async function (cookie) {
 
     cache.writeCache(cacheKey, { modules });
     return modules;
+}
+
+// 按练习ID批量获取错题或未写题目
+// type: 'wrong' = 答错题, 'unanswered' = 未写题(status===10)
+exports.getQuestionsByExerciseIds = async function (exerciseIds, type, cookie) {
+    let allQuestions = [];
+    let seenIds = new Set();
+
+    // 对练习ID去重，避免同一练习被处理多次
+    let uniqueExerciseIds = [...new Set(exerciseIds)];
+    console.log('导出: 去重后练习数=' + uniqueExerciseIds.length + ' (原始' + exerciseIds.length + '个), type=' + type);
+
+    for (let exerciseId of uniqueExerciseIds) {
+        try {
+            let report = await getExerciseReport(exerciseId, cookie);
+            if (!report || !report.answers) {
+                console.log('导出: 练习 ' + exerciseId + ' 无报告数据，跳过');
+                continue;
+            }
+
+            // 根据类型筛选题目ID
+            let targetIds = [];
+            report.answers.forEach(answer => {
+                if (type === 'wrong') {
+                    // 答了但答错（correct 为 falsy 值都算错，与原 getResultObj 逻辑一致）
+                    if (answer.status !== 10 && !answer.correct) {
+                        targetIds.push(answer.questionId);
+                    }
+                } else if (type === 'unanswered') {
+                    // 未写（status===10 表示跳过/未答）
+                    if (answer.status === 10) {
+                        targetIds.push(answer.questionId);
+                    }
+                }
+            });
+
+            console.log('导出: 练习 ' + exerciseId + ' 筛选到 ' + targetIds.length + ' 道目标题目');
+
+            // 题目去重
+            targetIds = targetIds.filter(qid => !seenIds.has(qid));
+            targetIds.forEach(qid => seenIds.add(qid));
+            if (targetIds.length === 0) continue;
+
+            console.log('导出: 练习 ' + exerciseId + ' 去重后新增 ' + targetIds.length + ' 道');
+
+            // 批量获取题目详情
+            for (let i = 0; i < targetIds.length; i += 20) {
+                let batchIds = targetIds.slice(i, i + 20);
+                try {
+                    let solutionMap = await getSolutionsByIds(batchIds, cookie);
+                    batchIds.forEach(qid => {
+                        let sol = solutionMap[qid];
+                        if (!sol) return;
+                        allQuestions.push({
+                            questionId: qid,
+                            content: sol.content,
+                            options: sol.accessories && sol.accessories[0] ? sol.accessories[0].options : [],
+                            correctAnswer: sol.correctAnswer,
+                            difficulty: sol.difficulty,
+                            source: sol.source,
+                            tags: (sol.tags || []).map(t => t.name),
+                            keypoints: (sol.keypoints || []).map(k => k.name),
+                            solution: sol.solution
+                        });
+                    });
+                } catch (e) {
+                    console.error('导出: 批量获取题目失败:', e.message);
+                }
+            }
+        } catch (e) {
+            console.error('导出: 练习 ' + exerciseId + ' 获取失败:', e.message);
+        }
+    }
+
+    console.log('导出: 共获取 ' + allQuestions.length + ' 道题目');
+    return allQuestions;
 }

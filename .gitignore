@@ -53,9 +53,11 @@ cache/
 # 临时测试脚本
 test_*.js
 _extract_pdf.js
+_debug_*.js
 
 # 临时文件
 --brand-prefix
+wrong-question-book/
 
 # Excel 数据（与 CSV 重复，勿上传）
 *.xlsx

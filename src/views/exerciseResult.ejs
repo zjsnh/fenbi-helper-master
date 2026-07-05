@@ -1094,15 +1094,23 @@
     var wrap = document.getElementById('video-wrap-' + questionId);
     if (wrap.style.display === 'none') {
       if (video.currentSrc) { wrap.style.display = 'block'; return; }
+      var btn = document.getElementById('show-video-'+questionId);
       fetch('/api/video/'+questionId)
         .then(function(r){ return r.ok?r.text():null; })
         .then(function(url){
-          if(!url) return;
-          document.getElementById('show-video-'+questionId).innerHTML = '收起视频';
+          if(!url || !url.trim()){
+            // 无视频（非会员或无解析），隐藏按钮
+            if(btn){ btn.style.display = 'none'; }
+            return;
+          }
+          btn.innerHTML = '收起视频';
           var source = document.createElement('source');
           source.type = 'video/mp4'; source.src = url;
           video.appendChild(source);
           wrap.style.display = 'block';
+        })
+        .catch(function(){
+          if(btn){ btn.style.display = 'none'; }
         });
     } else {
       video.pause();

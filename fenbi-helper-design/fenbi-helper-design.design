@@ -121,6 +121,11 @@
             "transitionLabel": "查看错题"
           },
           {
+            "domId": "cta-export-pdf",
+            "targetPageId": "page-wrong-pdf-export",
+            "transitionLabel": "导出PDF"
+          },
+          {
             "domId": "nav-home",
             "targetPageId": "page-history",
             "hideEdge": true,
@@ -131,14 +136,75 @@
             "targetPageId": "page-search",
             "hideEdge": true,
             "transitionLabel": "搜索"
-          },
-          {
-            "domId": "nav-back",
-            "targetPageId": "page-history",
-            "hideEdge": true,
-            "transitionLabel": "返回"
           }
         ]
+      }
+    },
+    {
+      "id": "page-wrong-pdf-export",
+      "title": "错题本 - 导出PDF",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1751598005000,
+      "canvasData": {
+        "x": 1440,
+        "y": 488,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/wrong-pdf-export.html",
+        "interactions": [
+          {
+            "domId": "modal-backdrop-close",
+            "targetPageId": "page-wrong-questions",
+            "hideEdge": true,
+            "transitionLabel": "关闭"
+          },
+          {
+            "domId": "btn-cancel",
+            "targetPageId": "page-wrong-questions",
+            "hideEdge": true,
+            "transitionLabel": "取消"
+          },
+          {
+            "domId": "btn-download",
+            "targetPageId": "page-wrong-questions",
+            "hideEdge": true,
+            "transitionLabel": "下载完成"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-pdf-template-content-v3",
+      "title": "PDF模板 - 错题内容页",
+      "type": "page",
+      "version": 3,
+      "createdAt": 1751598009000,
+      "canvasData": {
+        "x": 0,
+        "y": 1104,
+        "group": 1
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/pdf-template-content-v3.html",
+        "interactions": []
+      }
+    },
+    {
+      "id": "page-pdf-template-stats-v2",
+      "title": "PDF模板 - 词语统计页",
+      "type": "page",
+      "version": 2,
+      "createdAt": 1751598010000,
+      "canvasData": {
+        "x": 480,
+        "y": 1104,
+        "group": 1
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/pdf-template-stats-v2.html",
+        "interactions": []
       }
     },
     {
@@ -171,19 +237,13 @@
             "targetPageId": "page-wrong-questions",
             "hideEdge": true,
             "transitionLabel": "错题本"
-          },
-          {
-            "domId": "nav-back",
-            "targetPageId": "page-history",
-            "hideEdge": true,
-            "transitionLabel": "返回"
           }
         ]
       }
     }
   ],
   "config": {
-    "autoLayout": true,
+    "autoLayout": false,
     "deviceType": "tablet",
     "projectName": "粉笔刷题助手",
     "designLibrary": {
