@@ -167,6 +167,10 @@ router.get('/calc', async ctx => {
     await ctx.render('calc', {});
 });
 
+router.get('/shenlun-format', async ctx => {
+    await ctx.render('shenlun-format', {});
+});
+
 router.get('/history', async ctx => {
     let cookie = ctx.request.headers['cookie']
     if (!cookie || !cookie.includes('userid')) {

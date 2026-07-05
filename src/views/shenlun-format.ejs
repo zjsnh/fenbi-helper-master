@@ -1,0 +1,383 @@
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>申论公文格式 · 粉笔助手</title>
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    body { background: var(--paper); }
+
+    /* ── Hero 区 ── */
+    .page-hero {
+      background:
+        radial-gradient(ellipse at 20% 0%, rgba(0,102,204,0.05) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 100%, rgba(90,155,230,0.03) 0%, transparent 50%);
+      padding: 20px 0 8px;
+      margin: -32px -24px 20px;
+      padding-left: 24px;
+      padding-right: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+    .page-hero::before {
+      content: '';
+      position: absolute;
+      top: -30%; right: -15%;
+      width: 80%; height: 160%;
+      background: radial-gradient(circle at 50% 50%, rgba(0,102,204,0.03) 0%, transparent 40%);
+      animation: heroDrift 12s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes heroDrift { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-15px,15px); } }
+    .hero-title { font-size: 22px; font-weight: 700; color: var(--text-900); letter-spacing: -0.3px; animation: titleRise 0.6s var(--ease-spring) both; position: relative; z-index: 1; }
+    .hero-sub { font-size: 13px; color: var(--text-500); margin-top: 4px; animation: fadeUp 0.5s var(--ease-out) 0.08s both; position: relative; z-index: 1; }
+    @keyframes titleRise { from { opacity: 0; transform: translateY(16px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ── 统计栏 ── */
+    .stats-bar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
+    .stats-bar-item {
+      background: var(--card); border: 0.5px solid var(--border-light);
+      border-radius: 10px; padding: 12px 20px;
+      font-size: 13px; color: var(--text-sec);
+    }
+    .stats-bar-item b { color: #0a1628; font-weight: 700; font-size: 16px; }
+
+    /* ── 格式说明 ── */
+    .format-guide {
+      background: var(--card); border: 0.5px solid var(--border-light);
+      border-radius: 10px; padding: 14px 20px; margin-bottom: 24px;
+      font-size: 13px; line-height: 1.8; color: var(--text-sec);
+    }
+    .format-guide b { color: var(--brand-600, #0066cc); }
+    .format-guide .tag { display: inline-block; padding: 1px 7px; border-radius: 8px; font-size: 11px; margin: 0 2px; }
+    .tag-full { background: var(--brand-50, #e6f0ff); color: var(--brand-700, #004499); border: 1px solid var(--brand-100, #b8d4ff); }
+    .tag-partial { background: #fff5e6; color: #b8860b; border: 1px solid #ffdbb0; }
+    .tag-special { background: #e6f7ff; color: #096dd9; border: 1px solid #b8dbff; }
+
+    /* ── 分类卡片网格 ── */
+    .cat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    .cat-card {
+      background: var(--card);
+      border: 0.5px solid var(--border-light);
+      border-radius: 14px;
+      padding: 24px;
+      cursor: pointer;
+      transition: all 0.3s var(--ease-out);
+      position: relative;
+      overflow: hidden;
+      opacity: 0;
+      transform: translateY(20px) scale(0.97);
+    }
+    .cat-card.visible {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      transition: opacity 0.5s var(--ease-out), transform 0.5s var(--ease-spring),
+                  border-color 0.3s, box-shadow 0.3s;
+    }
+    .cat-card:hover { border-color: var(--g-300); box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
+    .cat-card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, var(--g-400), var(--g-600));
+      transform: scaleX(0); transform-origin: left;
+      transition: transform 0.5s var(--ease-out) 0.2s;
+    }
+    .cat-card.visible::before { transform: scaleX(1); }
+    .cat-card .cat-name { font-size: 18px; font-weight: 700; color: #0a1628; font-family: var(--font-display); margin-bottom: 8px; }
+    .cat-card .cat-count { font-size: 36px; font-weight: 800; color: var(--g-600); margin-bottom: 4px; font-family: var(--font-mono); letter-spacing: -1px; }
+    .cat-card .cat-sub { font-size: 13px; color: var(--text-ter); }
+
+    /* ── 文种列表页 ── */
+    .doc-list-page { display: none; }
+    .doc-list-page.show { display: block; animation: pageSlideIn 0.4s var(--ease-out); }
+    .category-page.hide { display: none; }
+    @keyframes pageSlideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+    .back-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 16px; background: var(--card);
+      border: 0.5px solid var(--border-light); border-radius: 980px;
+      font-size: 13px; color: var(--text-sec);
+      cursor: pointer; transition: all 0.25s var(--ease-out);
+      margin-bottom: 20px; animation: fadeUp 0.4s var(--ease-out) both;
+    }
+    .back-btn:hover { border-color: var(--g-300); color: #0a1628; background: var(--brand-50); }
+
+    .list-title { font-size: 20px; font-weight: 700; color: var(--text-900); margin-bottom: 20px; font-family: var(--font-display); animation: fadeUp 0.4s var(--ease-out) 0.06s both; }
+
+    /* ── 文种卡片网格 ── */
+    .doc-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 12px;
+    }
+    .doc-card {
+      background: var(--card);
+      border: 0.5px solid var(--border-light);
+      border-radius: 12px;
+      padding: 16px 18px;
+      cursor: pointer;
+      transition: border-color 0.25s, box-shadow 0.25s;
+      opacity: 0;
+      transform: translateY(12px);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .doc-card.visible {
+      opacity: 1;
+      transform: translateY(0);
+      transition: opacity 0.35s var(--ease-out), transform 0.35s var(--ease-out),
+                  border-color 0.25s, box-shadow 0.25s;
+    }
+    .doc-card:hover { border-color: var(--g-300); box-shadow: 0 2px 12px rgba(0,0,0,0.05); }
+    .doc-card .doc-name { font-size: 15px; font-weight: 700; color: #0a1628; font-family: var(--font-display); }
+    .doc-card .doc-fmt-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; border: 1px solid; align-self: flex-start; }
+    .fmt-full { background: var(--brand-50, #e6f0ff); color: var(--brand-600, #0066cc); border-color: var(--brand-100, #b8d4ff); }
+    .fmt-partial { background: #fff5e6; color: #b8860b; border-color: #ffdbb0; }
+    .fmt-special { background: #e6f7ff; color: #096dd9; border-color: #b8dbff; }
+    .doc-card .doc-scope { font-size: 12px; color: var(--text-ter); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+    /* ── 详情面板 ── */
+    .detail-panel {
+      display: none;
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 1000;
+      overflow-y: auto;
+      padding: 40px 20px;
+      animation: overlayFadeIn 0.25s var(--ease-out);
+    }
+    .detail-panel.show { display: block; }
+    @keyframes overlayFadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .detail-panel-inner {
+      max-width: 720px;
+      margin: 0 auto;
+      background: var(--card);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+      max-height: 80vh;
+      overflow-y: auto;
+      animation: panelPop 0.35s var(--ease-spring);
+    }
+    @keyframes panelPop { from { opacity: 0; transform: scale(0.95) translateY(12px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+    .detail-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px; padding-bottom: 12px;
+      border-bottom: 0.5px solid var(--border-light);
+      position: sticky; top: 0; background: var(--card); z-index: 1;
+    }
+    .detail-header h3 { margin: 0; font-size: 18px; font-weight: 700; color: #0a1628; display: flex; align-items: center; gap: 10px; }
+    .detail-header .close-btn { font-size: 20px; cursor: pointer; color: var(--text-ter); background: none; border: none; padding: 4px 8px; border-radius: 8px; transition: all 0.2s; }
+    .detail-header .close-btn:hover { background: var(--g-50); color: var(--text-900); }
+
+    .detail-section { margin-bottom: 16px; }
+    .detail-section:last-child { margin-bottom: 0; }
+    .detail-section-title { font-size: 13px; font-weight: 700; color: var(--brand-600, #0066cc); margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+    .detail-section-title::before { content: ''; width: 3px; height: 13px; border-radius: 2px; background: var(--brand-500, #0066cc); }
+    .detail-section-content { font-size: 14px; line-height: 1.8; color: var(--text-sec); }
+    .detail-section-content ul { margin: 4px 0; padding-left: 20px; }
+    .detail-section-content li { margin-bottom: 3px; }
+
+    .fmt-elements { display: flex; gap: 6px; flex-wrap: wrap; }
+    .fmt-el { font-size: 12px; padding: 2px 9px; border-radius: 8px; background: var(--brand-50, #e6f0ff); color: var(--brand-600, #0066cc); border: 1px solid var(--brand-100, #b8d4ff); }
+
+    .format-demo {
+      background: #faf9f6; border: 1px dashed var(--border-light);
+      border-radius: 10px; padding: 14px 18px;
+      font-size: 13px; line-height: 1.9; color: var(--text-sec);
+      white-space: pre-wrap; font-family: "SimSun", "宋体", serif;
+    }
+    .format-demo .bold { font-weight: 700; color: var(--brand-700, #004499); }
+  </style>
+</head>
+<body>
+
+<div class="navbar">
+  <a href="/history-category-complex" class="logo"><img src="/image.png" alt="">粉笔助手</a>
+  <a href="/history-category-complex">练习记录</a>
+  <a href="/history">列表视图</a>
+  <a href="/wrong-questions">错题本</a>
+  <a href="/word-frequency">词语统计</a>
+  <a href="/shenlun-format" class="active">公文格式</a>
+  <a href="/setup" style="margin-left:auto;">切换账号</a>
+</div>
+
+<div class="page-wrap" style="max-width:1100px; margin:0 auto; padding:32px 24px 60px;">
+  <div class="page-hero">
+    <div class="hero-title">申论公文格式</div>
+    <div class="hero-sub">国考申论常见公文文种格式速查 · 法定公文 / 事务文书 / 应用文</div>
+  </div>
+
+  <!-- 统计栏 -->
+  <div class="stats-bar">
+    <div class="stats-bar-item">文种总数 <b id="total-count">0</b></div>
+    <div class="stats-bar-item">分类数量 <b>3</b></div>
+  </div>
+
+  <!-- 分类页 -->
+  <div class="category-page" id="categoryPage">
+    <div class="format-guide">
+      <b>格式要素：</b>标题（首行居中，不加《》）、主送机关/称谓（顶格，后加冒号）、正文（首行空两格，分开头-主体-结尾）、落款（发文机关 + 日期，右下角）。
+      <span class="tag tag-full">完整格式</span>标题+称谓+正文+落款
+      <span class="tag tag-partial">不完整格式</span>视文种省略称谓或落款
+      <span class="tag tag-special">特殊格式</span>如简报报头报尾、编者按等
+    </div>
+    <div class="cat-grid" id="catGrid"></div>
+  </div>
+
+  <!-- 文种列表页 -->
+  <div class="doc-list-page" id="docListPage">
+    <button class="back-btn" onclick="showCategory()">&#x2190; 返回分类</button>
+    <div class="list-title" id="docListTitle"></div>
+    <div class="doc-grid" id="docGrid"></div>
+  </div>
+</div>
+
+<!-- 详情面板 -->
+<div class="detail-panel" id="detailPanel" onclick="if(event.target===this)closeDetail()">
+  <div class="detail-panel-inner" id="detailInner"></div>
+</div>
+
+<script>
+var DATA = {
+  '法定公文': [
+    { name:'命令（令）', fmt:'special', scope:'依照有关法律公布行政法规和规章，宣布施行重大强制性行政措施，嘉奖有关单位及人员。', elements:['标题','正文','落款'], framework:'原由 → 内容 → 要求；原因目的 → 规定或措施 → 希望或要求。', structure:['标题：发文机关 + 文种（如《中华人民共和国主席令》）','正文：颁布缘由 → 命令事项 → 执行要求','落款：签发人 + 日期'], demo:'【标题居中】\n中华人民共和国主席令\n第×号\n\n【正文】\n  《××法》已由××会议通过，现予公布，自×年×月×日起施行。\n\n【落款】\n            中华人民共和国主席 ××\n           2026年×月×日' },
+    { name:'决定', fmt:'partial', scope:'对重要事项或重大行动做出安排，奖惩有关单位及人员，变更或撤销下级机关不适当的决定事项。', elements:['标题','正文','落款'], framework:'是什么 → 为什么 → 怎么办；背景和目的 → 重要性和必要性 → 工作举措。', structure:['标题：发文机关 + 事由 + "决定"','正文：决定缘由 → 决定内容（分条列述）→ 执行要求','落款：发文机关 + 日期（主送机关可省略）'], demo:'【标题居中】\n××关于××的决定\n\n【正文】\n  为了××，经××研究，决定如下：\n  一、……\n  二、……\n  三、……\n  各地区各部门要认真贯彻执行。\n\n【落款】\n            ××\n           2026年×月×日' },
+    { name:'公告', fmt:'partial', scope:'向国内外宣布重要事项或法定事项。面向全社会，无须写收文机关称谓。', elements:['标题','正文','落款'], framework:'是什么 → 为什么 → 怎么办；背景 → 目的或意义 → 内容 → 号召。', structure:['标题：发文机关 + 事由 + "公告"','正文：公告缘由 → 公告事项 → 结束语（"特此公告"）','落款：发文机关 + 日期','注意：无主送机关（面向全社会）'], demo:'【标题居中】\n××关于××的公告\n\n【正文】\n  根据××，现将××公告如下：\n  一、……\n  二、……\n  特此公告。\n\n【落款】\n            ××\n           2026年×月×日' },
+    { name:'通告', fmt:'partial', scope:'公布各有关方面应当遵守或周知的事项。范围小于公告，一般也无须写通告对象称谓。', elements:['标题','正文','落款'], framework:'为什么 → 怎么办；目的 → 要求；事由 → 措施。', structure:['标题：发文机关 + 事由 + "通告"','正文：通告缘由 → 通告事项 → 执行要求 → 结束语（"特此通告"）','落款：发文机关 + 日期','注意：无主送机关'], demo:'【标题居中】\n××关于××的通告\n\n【正文】\n  为做好××工作，维护××，现将有关事项通告如下：\n  一、……\n  二、……\n  特此通告，望周知。\n\n【落款】\n            ××\n           2026年×月×日' },
+    { name:'通知', fmt:'full', scope:'发布传达要求下级执行和有关单位周知或执行的事项，批转、转发公文。申论高频考查文种。', elements:['标题','主送机关','正文','落款'], framework:'告知对象 → 告知事项 → 原因理由 → 落实要求。', structure:['标题：发文机关 + 事由 + "通知"（如《关于××的通知》）','主送机关：顶格书写，全称或规范简称，后加冒号','正文：通知缘由 → 通知事项 → 执行要求','落款：发文机关 + 日期'], demo:'【标题居中】\n××关于××的通知\n\n【主送机关顶格】\n各县（市、区）人民政府：\n\n【正文】\n  为了××，现将××有关事项通知如下：\n  一、……\n  二、……\n  请认真贯彻执行。\n\n【落款】\n            ××\n           2026年×月×日' },
+    { name:'通报', fmt:'full', scope:'表彰先进、批评错误、传达重要精神或情况。分表彰性、批评性、情况通报三种。', elements:['标题','主送机关','正文','落款'], framework:'事情原由 → 处理情况 → 经验教训总结 → 落实或预防要求。', structure:['标题：发文机关 + 事由 + "通报"','主送机关：顶格书写','正文：事由（叙述事实）→ 分析评价 → 决定（表彰/处分）→ 希望/要求','落款：发文机关 + 日期'], demo:'【标题居中】\n××关于××的通报\n\n【主送机关】\n各部门：\n\n【正文】\n  经查，××（叙述事实）。\n  这一行为××（分析评价）。为××，决定××。\n  希望广大××引以为戒/学习先进，××。\n\n【落款】\n            ××\n           2026年×月×日' },
+    { name:'报告', fmt:'full', scope:'向上级机关汇报工作、反映情况、回复询问。申论高频考查文种，分工作报告和情况报告。', elements:['标题','主送机关','正文','落款'], framework:'陈述基本情况 → 指出存在的问题 → 提出解决对策；背景与内涵 → 重要性与必要性 → 重要举措。', structure:['标题：发文机关 + 事由 + "报告"','主送机关：顶格书写（上级机关）','正文：报告缘由 → 报告内容 → 结束语（"特此报告"）','落款：发文机关 + 日期','注意：报告中不得夹带请示事项'], demo:'【标题居中】\n××关于××的报告\n\n【主送机关】\n××人民政府：\n\n【正文】\n  根据××要求，现将××情况报告如下：\n  一、基本情况\n  ……\n  二、主要做法\n  ……\n  三、下一步打算\n  ……\n  特此报告。\n\n【落款】\n            ××\n           2026年×月×日' },
+    { name:'请示', fmt:'full', scope:'向上级机关请求指示、批准。分求示性、求准性、求转性三种。', elements:['标题','主送机关','正文','落款'], framework:'请示理由 → 事项 → 要求；背景 → 目的 → 措施。', structure:['标题：发文机关 + 事由 + "请示"','主送机关：只有一个（上级机关），顶格书写','正文：请示缘由 → 请示事项 → 请示要求（"妥否，请批示"）','落款：发文机关 + 日期','注意：一文一事；不得同时抄送下级机关'], demo:'【标题居中】\n××关于××的请示\n\n【主送机关】\n××人民政府：\n\n【正文】\n  为了××（缘由），拟××（事项）。\n  现将有关情况请示如下：\n  一、……\n  二、……\n  妥否，请批示。\n\n【落款】\n            ××\n           2026年×月×日' },
+    { name:'批复', fmt:'full', scope:'答复下级机关请示事项。', elements:['标题','主送机关','正文','落款'], framework:'是什么 → 为什么 → 怎么办；背景理由 → 答复指示 → 工作要求。', structure:['标题：发文机关 + 事由 + "批复"','主送机关：请示的发文机关','正文：引述来文（"你《关于××的请示》收悉"）→ 批复意见 → 结束语（"此复"）','落款：发文机关 + 日期'], demo:'【标题居中】\n××关于××的批复\n\n【主送机关】\n××局：\n\n【正文】\n  你《关于××的请示》（×〔2026〕×号）收悉。经研究，现批复如下：\n  一、同意××。\n  二、……\n  此复。\n\n【落款】\n            ××\n           2026年×月×日' },
+    { name:'意见', fmt:'partial', scope:'对重要问题提出见解和处理办法，内容主体为对策。可作上行文、下行文。', elements:['标题','正文','落款'], framework:'是什么 → 为什么 → 怎么办；背景与目的 → 工作举措 → 工作要求。', structure:['标题：发文机关 + 事由 + "意见"','正文：引言（背景目的）→ 主体（指导原则、具体措施）→ 结尾（工作要求）','落款：发文机关 + 日期','主送机关视情况而定'], demo:'【标题居中】\n××关于××的意见\n\n【正文】\n  为××（背景目的），现就××提出如下意见：\n  一、总体要求\n  ……\n  二、主要任务\n  （一）……\n  （二）……\n  三、保障措施\n  ……\n\n【落款】\n            ××\n           2026年×月×日' },
+    { name:'函', fmt:'full', scope:'不相隶属机关之间商洽工作、询问和答复问题、请求批准和答复审批事项。多为平行文。', elements:['标题','主送机关','正文','落款'], framework:'是什么 → 为什么 → 怎么办；背景 → 理由 → 要求。', structure:['标题：发文机关 + 事由 + "函"（去函）或"复函"（复函）','主送机关：顶格书写','正文：发函缘由/复函引述 → 事项内容 → 结束语（"请函复"/"此复"）','落款：发文机关 + 日期'], demo:'【标题居中】\n××关于××的函\n\n【主送机关】\n××局：\n\n【正文】\n  为××（缘由），现就××事项函告如下：\n  一、……\n  二、……\n  请予支持配合为盼。\n\n【落款】\n            ××\n           2026年×月×日' },
+    { name:'议案', fmt:'full', scope:'各级人民政府按法律程序向同级人大或人大常委会提请审议事项。考试考查可能性低。', elements:['标题','主送机关','正文','落款'], framework:'提请审议的事项 → 理由 → 期望和要求。', structure:['标题：发文机关 + 事由 + "议案"','主送机关：同级人大或人大常委会','正文：提请审议事项 → 审议理由 → 期望要求','落款：发文机关 + 日期'], demo:'【标题居中】\n××关于××的议案\n\n【主送机关】\n××人民代表大会：\n\n【正文】\n  为了××，现提请审议××。\n  一、……\n  二、……\n  请予审议。\n\n【落款】\n            ××\n           2026年×月×日' },
+    { name:'纪要', fmt:'special', scope:'记载、传达会议情况和议定事项。须主旨突出、层次清楚，区别于原始会议记录。', elements:['标题','正文'], framework:'是什么 → 为什么 → 怎么办；背景 → 理由 → 措施 → 要求。', structure:['标题：会议名称 + "纪要"（如《××会议纪要》）','正文：会议概况（时间、地点、参会人）→ 议定事项（分条）','无主送机关、无落款（特殊格式）'], demo:'【标题居中】\n××会议纪要\n\n【正文】\n  ×年×月×日，××在××召开××会议。××主持会议，××等出席。\n  会议研究议定以下事项：\n  一、……\n  二、……\n  三、……' },
+    { name:'公报', fmt:'partial', scope:'公布重要决定或重大事项。面向全社会，无主送机关。', elements:['标题','正文','落款'], framework:'背景 → 内容 → 号召。', structure:['标题：会议名称/发文机关 + "公报"','正文：会议概况 → 主要内容/决定事项','落款：发文机关 + 日期'], demo:'【标题居中】\n××公报\n\n【正文】\n  ×年×月×日，××会议在××举行。\n  会议听取和讨论了××，审议通过了××。\n  ……\n\n【落款】\n            ××\n           2026年×月×日' },
+    { name:'决议', fmt:'partial', scope:'经会议讨论通过的重要决策事项。', elements:['标题','正文','落款'], framework:'是什么 → 为什么 → 怎么办。', structure:['标题：会议名称 + 事由 + "决议"','正文：决议缘由 → 决议内容 → 执行要求','落款：会议名称 + 日期'], demo:'【标题居中】\n××关于××的决议\n\n【正文】\n  ×年×月×日，××会议讨论通过如下决议：\n  一、……\n  二、……\n  三、……\n\n【落款】\n            ××\n           2026年×月×日' }
+  ],
+  '事务文书': [
+    { name:'讲话稿', fmt:'partial', scope:'行政机关工作人员为特定目的、场合、对象发表讲话的文字底稿。', elements:['标题','称谓','正文'], framework:'背景介绍 → 讲话目的 → 表明态度观点 → 工作措施 → 期望和要求。', structure:['标题：场合 + 主题 + "讲话"（或直接点明主题）','称谓：顶格，如"同志们："','正文：开头点题 → 主体分部分论述 → 结尾总结/号召','注意：一般无落款（口语化文稿）'], demo:'【标题居中】\n在××会议上的讲话\n\n【称谓顶格】\n同志们：\n\n【正文】\n  今天，我们召开××会议，主要任务是××。\n  一、充分认识××的重要意义\n  ……\n  二、准确把握××的重点任务\n  ……\n  三、切实加强××的组织领导\n  ……\n  同志们，让我们××！' },
+    { name:'演讲词', fmt:'partial', scope:'用于演讲的文字稿本，在讲话稿基础上突出鼓动性、感染性，含较多抒情成分。', elements:['标题','称谓','正文'], framework:'背景场合 → 演讲目的 → 解决的必要性重要性 → 对策 → 感言倡议鼓动。', structure:['标题：主题 + "演讲"（或直接点明主题）','称谓：顶格','正文：引入 → 论述 → 抒情鼓动 → 号召','注意：语言灵活，无落款'], demo:'【标题居中】\n××（主题型标题）\n\n【称谓】\n各位朋友：\n\n【正文】\n  ××（引入话题）。\n  为什么××？因为××。\n  让我们××（鼓动号召）！' },
+    { name:'倡议书', fmt:'full', scope:'公开信的一种，面向全社会或特定群体提出倡导、建议。', elements:['标题','称谓','正文','落款'], framework:'背景 → 必要性重要性 → 倡议内容 → 结尾再次呼吁。', structure:['标题：事由 + "倡议书"（或"致××的倡议书"）','称谓：倡议对象，顶格','正文：倡议背景/理由 → 倡议内容（分条）→ 号召','落款：倡议人/单位 + 日期'], demo:'【标题居中】\n关于××的倡议书\n\n【称谓】\n广大市民朋友们：\n\n【正文】\n  ××（背景理由）。为此，我们发出如下倡议：\n  一、××。\n  二、××。\n  三、××。\n  让我们携手××！\n\n【落款】\n            ××\n           2026年×月×日' },
+    { name:'公开信', fmt:'full', scope:'党政机关面向全体社会成员的公开性书信，就某一问题向公众发出倡议、提出要求。', elements:['标题','称谓','正文','落款'], framework:'现状阐述 → 问题 → 必要性重要性 → 对策 → 倡议号召。', structure:['标题："致××的公开信"','称谓：收信对象，顶格','正文：写信缘由 → 主要内容 → 希望与号召','结束语："此致敬礼"或自然结尾','落款：写信人/单位 + 日期'], demo:'【标题居中】\n致××的公开信\n\n【称谓】\n××：\n\n【正文】\n  ××（缘由）。\n  一、……\n  二、……\n  希望大家××。\n  此致\n  敬礼！\n\n【落款】\n            ××\n           2026年×月×日' },
+    { name:'建议书', fmt:'full', scope:'以解决问题为目的，内容主要是对策性建议，从事实与科学角度阐明问题危害、原因及对策必要性。', elements:['标题','称谓','正文','落款'], framework:'现状及分析 → 必要性重要性 → 对策措施。', structure:['标题：事由 + "建议书"（或"建议信"）','称谓：建议对象，顶格','正文：现状分析 → 建议措施（分条）','落款：建议人/单位 + 日期'], demo:'【标题居中】\n关于××的建议书\n\n【称谓】\n××：\n\n【正文】\n  当前，××（现状）。为此，提出以下建议：\n  一、……\n  二、……\n  三、……\n  希望采纳为盼。\n\n【落款】\n            ××\n           2026年×月×日' },
+    { name:'计划', fmt:'partial', scope:'对全局或单项工作进行预想性安排部署，与规划、要点、方案类似。', elements:['标题','正文','落款'], framework:'是什么 → 为什么 → 怎么办；指导思想 → 工作原则 → 目标任务 → 具体措施。', structure:['标题：单位 + 期限 + "计划"（或事由 + "工作方案"）','正文：指导思想/目标 → 工作原则 → 主要任务 → 实施步骤 → 保障措施','落款：制定单位 + 日期'], demo:'【标题居中】\n××2026年××工作计划\n\n【正文】\n  为××，特制定本计划。\n  一、指导思想\n  ……\n  二、工作目标\n  ……\n  三、主要任务\n  （一）……\n  四、实施步骤\n  第一阶段：……\n  第二阶段：……\n  五、保障措施\n  ……\n\n【落款】\n            ××\n           2026年×月×日' },
+    { name:'工作总结', fmt:'partial', scope:'对一定时期、单项或全面工作的回顾与分析、评价。', elements:['标题','正文','落款'], framework:'情况介绍 → 措施效果 → 总结经验教训；工作概括 → 具体工作 → 存在问题 → 解决措施 → 展望未来。', structure:['标题：单位/时间 + "工作总结"','正文：基本情况 → 主要工作及成绩 → 存在问题 → 经验体会 → 下步打算','落款：单位 + 日期'], demo:'【标题居中】\n××2026年工作总结\n\n【正文】\n  2026年以来，××（基本情况）。\n  一、主要工作及成绩\n  （一）……\n  二、存在问题\n  ……\n  三、经验体会\n  ……\n  四、下一步打算\n  ……\n\n【落款】\n            ××\n           2026年×月×日' },
+    { name:'调查报告', fmt:'partial', scope:'带着一定目的，采取社会化调查方法，在取得资料、分析研究基础上写成的有事实、有观点、有结论的书面报告。', elements:['标题','正文','落款'], framework:'是什么 → 为什么 → 怎么办；调查背景 → 调查方式 → 调查内容 → 调查结果 → 应对之策。', structure:['标题：调查对象 + 调研内容 + "调查报告"（或"调研报告"）','正文：调研背景/目的 → 调研方式 → 基本情况 → 存在问题 → 对策建议','落款：调研组/单位 + 日期'], demo:'【标题居中】\n关于××的调查报告\n\n【正文】\n  一、调查背景与目的\n  ……\n  二、调查基本情况\n  ……\n  三、存在的主要问题\n  （一）……\n  四、对策建议\n  （一）……\n\n【落款】\n            ××调查组\n           2026年×月×日' },
+    { name:'简报', fmt:'special', scope:'用于汇报工作、反映情况、交流经验的事务性文书。格式特殊，含报头和报尾。', elements:['报头','标题','正文','报尾'], framework:'导语（概述）→ 主体（具体情况）→ 结语（小结/下一步）。', structure:['报头：简报名称 + 期号 + 编发单位 + 日期（左右分布）','标题：概括简报核心内容，居中','正文：导语 → 主体 → 结语','报尾：发送范围 + 共印份数','注意：特殊格式，不同于常规公文'], demo:'【报头】\n  ××简报\n  第×期\n  ××编            2026年×月×日\n──────────────────\n【标题】\n××工作开展情况\n\n【正文】\n  ××以来，××（导语）。\n  一、……\n  二、……\n  下一步，××。\n──────────────────\n【报尾】\n送：××\n发：××              共印×份' },
+    { name:'汇报', fmt:'partial', scope:'向上级总结工作、反映问题、报告情况、提出意见和建议的文体。', elements:['标题','正文','落款'], framework:'是什么 → 为什么 → 怎么办；存在问题 → 原因和影响分析 → 解决对策。', structure:['标题：汇报内容 + "汇报"（或"汇报材料"）','正文：基本情况 → 主要做法 → 成效 → 问题 → 建议','落款：汇报单位 + 日期'], demo:'【标题居中】\n关于××的汇报\n\n【正文】\n  一、基本情况\n  ……\n  二、主要做法\n  （一）……\n  三、取得成效\n  ……\n  四、存在问题及建议\n  ……\n\n【落款】\n            ××\n           2026年×月×日' },
+    { name:'答复', fmt:'partial', scope:'以书面形式对人大代表建议、质询，政协委员提案，人民意见建议作出的答复。', elements:['标题','主送机关','正文','落款'], framework:'态度 → 现状 → 措施；背景 → 目的 → 措施 → 决心或期望。', structure:['标题：发文机关 + 事由 + "答复"（或"复函"）','主送机关：建议/提案人','正文：引述来文 → 答复内容 → 结束语','落款：发文机关 + 日期'], demo:'【标题居中】\n××关于××的答复\n\n【主送机关】\n××代表：\n\n【正文】\n  您提出的《关于××的建议》收悉。现答复如下：\n  一、……\n  二、……\n  感谢您对××工作的关心支持。\n\n【落款】\n            ××\n           2026年×月×日' },
+    { name:'责任书', fmt:'partial', scope:'为明确责任和工作目标、任务，调动工作积极性，推动工作完成、保证效率质量的文书。', elements:['标题','正文','落款'], framework:'背景目的 → 指导思想 → 工作目标 → 具体任务措施 → 奖惩措施。', structure:['标题：事由 + "责任书"','正文：背景目的 → 工作目标 → 具体任务 → 奖惩措施','落款：签订双方 + 日期'], demo:'【标题居中】\n××目标责任书\n\n【正文】\n  为××，特签订本责任书。\n  一、工作目标\n  ……\n  二、具体任务\n  ……\n  三、奖惩措施\n  ……\n\n【落款】\n        甲方：××        乙方：××\n       2026年×月×日' },
+    { name:'新闻发布稿', fmt:'special', scope:'行政机关用于对外发布信息的书面文稿，最终接受对象是全体公众。', elements:['标题','正文'], framework:'是什么 → 为什么 → 怎么办；政策背景 → 政策内容 → 决心表态期望。', structure:['标题：发布主题 + "新闻发布稿"（或直接点明主题）','正文：政策背景 → 发布内容 → 决心表态','注意：一般无落款'], demo:'【标题居中】\n××新闻发布稿\n\n【正文】\n  各位记者朋友：\n  大家好！现将××有关情况发布如下：\n  一、……\n  二、……\n  希望各界××。谢谢大家！' }
+  ],
+  '应用文': [
+    { name:'编者按', fmt:'special', scope:'编辑人员对新闻报道或文章所加的评论性说明文字。篇幅简短，一般百字左右。', elements:['标题','正文'], framework:'交代背景 → 点明意义 → 提示要点/引导阅读。', structure:['位置：正文之前，左空两格直接写"编者按："+ 冒号','正文：紧跟冒号后书写，交代背景 → 点明意义 → 引导阅读','注意：无独立标题（"编者按"即标识）、无落款'], demo:'【左空两格】\n  编者按：××（交代背景）。××（点明意义）。希望广大××认真××（引导），从中××。现予以刊发，供参考。' },
+    { name:'提纲', fmt:'special', scope:'宣传提纲、讲话提纲、发言提纲、建议提纲、汇报提纲等。一般不作为独立文种考查。', elements:['标题','正文'], framework:'以序号分层次列要点，不展开论述。', structure:['标题：场合 + "××提纲"，居中','正文：以序号分层次列要点','格式：一级"一、二、三"，二级"（一）（二）"，三级"1. 2."','注意：一般只写标题+正文，无落款'], demo:'【标题居中】\n在××会议上的讲话提纲\n\n【正文】\n  一、充分认识××的意义\n    （一）……\n    （二）……\n  二、扎实推进××工作\n    （一）……\n    1. ……\n    2. ……\n  三、切实加强××保障\n    （一）……' },
+    { name:'宣传稿', fmt:'full', scope:'用于宣传政策、推广经验、动员群众的文稿。语言生动通俗，有感染力。', elements:['标题','称谓','正文','落款'], framework:'宣传背景 → 核心内容 → 典型案例 → 号召行动。', structure:['标题：醒目，概括宣传主题（可灵活拟写）','称谓：宣传对象，顶格','正文：引入话题 → 核心内容（政策/经验）→ 号召行动','落款：宣传单位 + 日期'], demo:'【标题居中】\n××（主题型标题）\n\n【称谓】\n各位居民：\n\n【正文】\n  ××（引入话题）。\n  一、什么是××\n  ……\n  二、为什么要××\n  ……\n  三、怎么做××\n  ……\n  让我们一起行动起来，××！\n\n【落款】\n            ××\n           2026年×月×日' },
+    { name:'短评', fmt:'special', scope:'对某一事件、现象发表简短评论的文章。评论类公文，行文结构为"标题+正文"。', elements:['标题','正文'], framework:'引述事件 → 分析评论 → 表明态度/提出建议。', structure:['标题：观点鲜明，突出评论对象，居中（不加文种）','正文：引述事件 → 分析评论 → 表明态度 → 提出建议','注意：标题+正文，无称谓、无落款；篇幅短小'], demo:'【标题居中】\n××（观点型标题）\n\n【正文】\n  近日，××（引述事件）。这一现象引发××关注。\n  之所以××，是因为××（分析原因）。这不仅××，更××（指出危害/意义）。\n  因此，××（对策建议）。只有××，才能××。' },
+    { name:'导学材料', fmt:'special', scope:'引导学习用的材料，把材料内容按一定逻辑捋顺，条分缕析写清楚。', elements:['标题','正文'], framework:'开头 → 主体 → 结尾，按材料逻辑梳理。', structure:['标题：包含题目主题词，居中','正文：开头 → 主体（分条）→ 结尾','注意：标题+正文，与一般公文正文书写格式类似'], demo:'【标题居中】\n关于××的导学材料\n\n【正文】\n  一、××的基本内涵\n  ……\n  二、××的重要意义\n  ……\n  三、××的实践要求\n  ……' }
+  ]
+};
+
+var FMT_LABEL = { full:{text:'完整格式',cls:'fmt-full'}, partial:{text:'不完整格式',cls:'fmt-partial'}, special:{text:'特殊格式',cls:'fmt-special'} };
+
+// 统计
+var totalCount = 0;
+Object.keys(DATA).forEach(function(k){ totalCount += DATA[k].length; });
+document.getElementById('total-count').textContent = totalCount;
+
+// 渲染分类卡片
+function renderCategoryPage() {
+  var grid = document.getElementById('catGrid');
+  var html = '';
+  Object.keys(DATA).forEach(function(cat, idx) {
+    var count = DATA[cat].length;
+    html += '<div class="cat-card" onclick="showDocList(\'' + cat + '\')">' +
+      '<div class="cat-name">' + cat + '</div>' +
+      '<div class="cat-count">' + count + '</div>' +
+      '<div class="cat-sub">点击查看文种详情</div>' +
+      '</div>';
+  });
+  grid.innerHTML = html;
+  // 渐入动画
+  var cards = grid.querySelectorAll('.cat-card');
+  cards.forEach(function(c, i) {
+    setTimeout(function() { c.classList.add('visible'); }, i * 80);
+  });
+}
+
+// 显示文种列表
+function showDocList(cat) {
+  document.getElementById('categoryPage').classList.add('hide');
+  var page = document.getElementById('docListPage');
+  page.classList.add('show');
+
+  document.getElementById('docListTitle').textContent = cat + '（' + DATA[cat].length + ' 种）';
+
+  var grid = document.getElementById('docGrid');
+  var html = '';
+  DATA[cat].forEach(function(d, i) {
+    var fmt = FMT_LABEL[d.fmt];
+    html += '<div class="doc-card" onclick="showDetail(' + i + ',\'' + cat + '\')">' +
+      '<div class="doc-name">' + d.name + '</div>' +
+      '<span class="doc-fmt-badge ' + fmt.cls + '">' + fmt.text + '</span>' +
+      '<div class="doc-scope">' + d.scope + '</div>' +
+      '</div>';
+  });
+  grid.innerHTML = html;
+  // 渐入动画
+  var cards = grid.querySelectorAll('.doc-card');
+  cards.forEach(function(c, i) {
+    setTimeout(function() { c.classList.add('visible'); }, i * 40);
+  });
+}
+
+// 返回分类
+function showCategory() {
+  document.getElementById('docListPage').classList.remove('show');
+  document.getElementById('categoryPage').classList.remove('hide');
+}
+
+// 显示详情面板
+function showDetail(idx, cat) {
+  var d = DATA[cat][idx];
+  var fmt = FMT_LABEL[d.fmt];
+  var html = '<div class="detail-header">' +
+    '<h3>' + d.name + '<span class="doc-fmt-badge ' + fmt.cls + '">' + fmt.text + '</span></h3>' +
+    '<button class="close-btn" onclick="closeDetail()">&times;</button>' +
+    '</div>' +
+    '<div class="detail-section"><div class="detail-section-title">适用范围</div><div class="detail-section-content">' + d.scope + '</div></div>' +
+    '<div class="detail-section"><div class="detail-section-title">格式要素</div><div class="fmt-elements">' +
+      d.elements.map(function(e){ return '<span class="fmt-el">' + e + '</span>'; }).join('') +
+    '</div></div>' +
+    '<div class="detail-section"><div class="detail-section-title">基本框架</div><div class="detail-section-content">' + d.framework + '</div></div>' +
+    '<div class="detail-section"><div class="detail-section-title">结构要素</div><div class="detail-section-content"><ul>' +
+      d.structure.map(function(s){ return '<li>' + s + '</li>'; }).join('') +
+    '</ul></div></div>' +
+    '<div class="detail-section"><div class="detail-section-title">格式示意</div><div class="format-demo">' + formatDemo(d.demo) + '</div></div>';
+
+  document.getElementById('detailInner').innerHTML = html;
+  document.getElementById('detailPanel').classList.add('show');
+}
+
+function closeDetail() {
+  document.getElementById('detailPanel').classList.remove('show');
+}
+
+function formatDemo(text) {
+  return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/【([^】]+)】/g, '<span class="bold">【$1】</span>');
+}
+
+renderCategoryPage();
+</script>
+</body>
+</html>
