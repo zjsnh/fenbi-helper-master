@@ -56,6 +56,9 @@ test_*.py
 _extract_pdf.js
 _debug_*.js
 
+# API 接口文档（本地参考，不推送）
+api-reference.md
+
 # 临时文件
 --brand-prefix
 wrong-question-book/
