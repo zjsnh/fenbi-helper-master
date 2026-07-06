@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="zh">
 <head>
   <meta charset="UTF-8">
@@ -754,7 +755,11 @@
       border-color: var(--danger);
       color: #fff;
     }
+    /* KaTeX 公式样式 */
+    .quz-content .katex { font-size: 1.05em; }
+    .katex-display { margin: 8px 0; overflow-x: auto; overflow-y: hidden; }
   </style>
+  <link rel="stylesheet" href="/js/katex/katex.min.css">
 </head>
 <body>
 
@@ -1273,6 +1278,23 @@
 
   // 初始化笔记
   genMdNote(<%= concernQuestions.map(function(i){return i.questionId}) %>);
+</script>
+
+<!-- KaTeX：LaTeX 公式渲染（题干、选项、解析） -->
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="/js/katex/auto-render.min.js"></script>
+<script>
+// 渲染题干、选项、解析中的 LaTeX 公式
+renderMathInElement(document.body, {
+  delimiters: [
+    {left: '$$', right: '$$', display: true},
+    {left: '\\[', right: '\\]', display: true},
+    {left: '\\(', right: '\\)', display: false},
+    {left: '$', right: '$', display: false}
+  ],
+  throwOnError: false,
+  ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+});
 </script>
 </body>
 </html>

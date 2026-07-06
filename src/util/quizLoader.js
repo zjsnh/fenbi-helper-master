@@ -135,9 +135,13 @@ function parseQuestion(row, header, source, setId, qNo) {
   // 知识点
   const knowledge = get('知识点') || '';
 
-  // 图片URL（仅逻辑推理有）
+  // 图片URL（题干配图）
   let imageUrl = get('图片URL') || '';
   imageUrl = String(imageUrl).trim();
+
+  // 解析图片URL（解析区配图）
+  let analysisImageUrl = get('解析图片URL') || '';
+  analysisImageUrl = String(analysisImageUrl).trim();
 
   // 全局唯一ID
   const uid = setId + '_q' + qNo;
@@ -153,7 +157,8 @@ function parseQuestion(row, header, source, setId, qNo) {
     answer,         // 正确答案字母 A/B/C/D/E/F
     analysis,       // 解析
     knowledge,      // 知识点
-    imageUrl        // 图片URL（可能为空）
+    imageUrl,       // 题干图片URL（可能为空，多图用|分隔）
+    analysisImageUrl // 解析图片URL（可能为空，多图用|分隔）
   };
 }
 

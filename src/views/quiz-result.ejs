@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="zh">
 <head>
   <meta charset="UTF-8">
@@ -213,7 +214,11 @@
       color: var(--text-ter);
       font-size: 14px;
     }
+    /* KaTeX 公式样式：行内不溢出，块级居中 */
+    .q-stem-full .katex, .opt-row .katex, .analysis-block .katex { font-size: 1.05em; }
+    .katex-display { margin: 8px 0; overflow-x: auto; overflow-y: hidden; }
   </style>
+  <link rel="stylesheet" href="/js/katex/katex.min.css">
 </head>
 <body>
 
@@ -282,9 +287,16 @@
           </div>
           <div class="q-item-body">
             <div class="q-stem-full"><%= q.stem %></div>
-            <% if (q.imageUrl) { %>
-              <img class="q-image-full" src="<%= q.imageUrl %>" alt="" onerror="this.style.display='none'">
-            <% } %>
+            <% if (q.imageUrl) {
+              const stemImgs = String(q.imageUrl).split('|').map(s => s.trim()).filter(Boolean);
+              stemImgs.forEach(src => {
+                let realSrc = src;
+                if (!/^https?:\/\//i.test(src) && src.charAt(0) !== '/') {
+                  realSrc = '/quiz-img/' + encodeURIComponent(record.source) + '/' + src.replace(/^\/+/, '');
+                }
+            %>
+              <img class="q-image-full" src="<%= realSrc %>" alt="" onerror="this.style.display='none'">
+            <% }); } %>
 
             <div class="opts-block">
               <% for (let j = 0; j < q.options.length; j++) {
@@ -302,12 +314,22 @@
 
             <div class="answer-line">
               我的答案：<b><%= q.myAnswer || '未作答' %></b>
-             　 正确答案：<b><%= q.answer %></b>
+              　 正确答案：<b><%= q.answer %></b>
             </div>
 
             <div class="analysis-block">
               <div class="analysis-title">解析</div>
               <%- (q.analysis || '').replace(/\s+/g, ' ').trim() %>
+              <% if (q.analysisImageUrl) {
+                const analysisImgs = String(q.analysisImageUrl).split('|').map(s => s.trim()).filter(Boolean);
+                analysisImgs.forEach(src => {
+                  let realSrc = src;
+                  if (!/^https?:\/\//i.test(src) && src.charAt(0) !== '/') {
+                    realSrc = '/quiz-img/' + encodeURIComponent(record.source) + '/' + src.replace(/^\/+/, '');
+                  }
+              %>
+                <img class="q-image-full" src="<%= realSrc %>" alt="解析图片" onerror="this.style.display='none'" style="margin-top:8px;">
+              <% }); } %>
             </div>
             <% if (q.knowledge) { %>
               <span class="knowledge-tag"><%= q.knowledge %></span>
@@ -404,6 +426,23 @@ function exportPDF() {
     btn.innerText = orig;
   });
 }
+</script>
+
+<!-- KaTeX：LaTeX 公式渲染 -->
+<script src="/js/katex/katex.min.js"></script>
+<script src="/js/katex/auto-render.min.js"></script>
+<script>
+// 渲染题干、选项、解析中的 LaTeX 公式
+renderMathInElement(document.body, {
+  delimiters: [
+    {left: '$$', right: '$$', display: true},
+    {left: '\\[', right: '\\]', display: true},
+    {left: '\\(', right: '\\)', display: false},
+    {left: '$', right: '$', display: false}
+  ],
+  throwOnError: false,
+  ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+});
 </script>
 </body>
 </html>

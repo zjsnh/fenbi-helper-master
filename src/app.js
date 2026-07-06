@@ -68,7 +68,11 @@ app.use(router.routes()).use(router.allowedMethods())
 
 app.use(async(ctx, next) => {
     if (ctx.status === 404) {
-        ctx.redirect('/history-category-complex');
+        if (ctx.path.startsWith('/api/')) {
+            ctx.body = { code: 404, message: '接口不存在: ' + ctx.path };
+        } else {
+            ctx.redirect('/history-category-complex');
+        }
     } else {
         next();
     }
@@ -183,6 +187,29 @@ router.get('/shenlun-format', async ctx => {
 // ══════════════════════════════════════
 //  本地题库刷题模块
 // ══════════════════════════════════════
+// 题库图片静态服务：/quiz-img/:source/* => local-quiz-bank/:source/*
+// 用于 xlsx 中 图片URL 字段填相对路径（如 images/p01_q04_1.jpg）时前端可访问
+router.get('/quiz-img/:source/(.*)', async ctx => {
+    const source = decodeURIComponent(ctx.params.source);
+    const relPath = ctx.params[0];
+    // 安全校验：禁止路径穿越
+    if (relPath.indexOf('..') >= 0 || path.isAbsolute(relPath)) {
+        ctx.status = 400;
+        ctx.body = 'Invalid path';
+        return;
+    }
+    const fullPath = path.join(__dirname, '..', 'local-quiz-bank', source, relPath);
+    if (!fs.existsSync(fullPath)) {
+        ctx.status = 404;
+        ctx.body = 'Image not found';
+        return;
+    }
+    const ext = path.extname(fullPath).toLowerCase();
+    const mimeMap = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.gif': 'image/gif', '.webp': 'image/webp' };
+    ctx.type = mimeMap[ext] || 'application/octet-stream';
+    ctx.body = fs.createReadStream(fullPath);
+});
+
 router.get('/quiz', async ctx => {
     const groups = await quizLoader.listSets();
     const progressMap = quizRecord.getAllSetProgress();
@@ -306,7 +333,8 @@ router.post('/quiz/:setId/submit', async ctx => {
             flagged: flaggedSet.has(q.qNo),
             analysis: q.analysis,
             knowledge: q.knowledge,
-            imageUrl: q.imageUrl
+            imageUrl: q.imageUrl,
+            analysisImageUrl: q.analysisImageUrl || ''
         };
     });
 

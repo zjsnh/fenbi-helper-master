@@ -21,7 +21,8 @@ description: "Generates standardized local quiz banks (xlsx/apkg) for the fenbi-
 | 题型 | 选填 | 「单选」「多选」「多项选择」；留空默认按单选处理 |
 | 解析 | 选填 | 题目解析文本 |
 | 知识点 | 选填 | 考点标签 |
-| 图片URL | 选填 | 题目配图链接，http/https 开头 |
+| 图片URL | 选填 | 题干配图链接，支持三种格式：1) http/https 绝对URL；2) 相对路径如 `images/p01_q04_1.jpg`（需配合题库目录下的 images 子目录 + 服务端 `/quiz-img/:source/*` 路由）；3) 多图用 `\|` 分隔，如 `images/a.jpg\|images/b.jpg` |
+| 解析图片URL | 选填 | 解析区配图链接（解析示意图），格式同"图片URL"；在 quiz-result.ejs 的解析文本下方渲染 |
 | 题号 | 选填 | 仅记录用，不影响加载 |
 
 **关键约束：**
@@ -551,3 +552,61 @@ def pdf_to_xlsx(pdf_path, out_xlsx_path, mode='single'):
 - 多选题被当单选 → 检查 `题型` 字段是否包含「多选」或「多项」字样
 - 答案错误 → 单选题答案只取首字母，多选题答案去重排序，确认填写规范
 - 解析空白多 → 已在结果页自动 `replace(/\s+/g, ' ')`，源数据可保留原始换行
+- 图片不显示 → 检查 `图片URL` 字段：相对路径需以 `images/` 开头且图片实际存在于题库目录的 `images/` 子目录；多图需用 `|` 分隔；浏览器 Network 面板检查 `/quiz-img/:source/*` 请求是否 200
+
+---
+
+## 九、本地图片路径规范（重要）
+
+当题目含图表、几何图、函数图等图片时，推荐使用**本地相对路径**而非远程 URL，避免链接过期。
+
+### 目录结构
+
+```
+我的题库/                          ← 文件夹名 = 分类名（source）
+├── 专项练习01.xlsx                ← 题套文件
+├── 专项练习02.xlsx
+├── ...
+└── images/                        ← 图片目录（固定命名）
+    ├── p01_q04_1.jpg              ← 命名建议：p{套号}_q{题号}_{序号}.jpg
+    ├── p01_q04_2.jpg
+    └── p02_q05_1.jpg
+```
+
+### xlsx 中图片URL字段填写
+
+| 场景 | 填写值 | 说明 |
+|---|---|---|
+| 单图 | `images/p01_q04_1.jpg` | 相对路径，以 `images/` 开头 |
+| 多图 | `images/p01_q04_1.jpg\|images/p01_q04_2.jpg` | 用 `\|` 分隔 |
+| 远程URL | `https://example.com/img.jpg` | http/https 开头，原样使用 |
+| 空值 | （留空） | 无图片 |
+
+### 服务端路由
+
+服务端自动通过 `/quiz-img/:source/*` 路由提供图片访问：
+- 请求 `/quiz-img/我的题库/images/p01_q04_1.jpg`
+- 映射到 `local-quiz-bank/我的题库/images/p01_q04_1.jpg`
+- 自动设置 Content-Type，支持 jpg/png/gif/webp
+- 路径穿越防护：禁止 `..` 和绝对路径
+
+### 前端渲染
+
+[quiz-play.ejs](file:///d:/fenbi/fenbi-helper-master/src/views/quiz-play.ejs) 中的 `buildImgSrc()` 函数自动处理：
+- 相对路径 `images/xxx.jpg` → `/quiz-img/{source}/images/xxx.jpg`
+- 绝对 URL → 原样使用
+- 多图 `|` 分隔 → 循环渲染多个 `<img>`
+
+### 从 OCR markdown 提取图片
+
+PaddleOCR 等 OCR 工具输出的 markdown 中，图片格式为：
+```html
+<div style="text-align: center;"><img src="https://..." alt="Image" width="25%" /></div>
+```
+
+提取流程：
+1. 正则匹配 `<div style="text-align: center;"><img src="(https?://[^"]+)" alt="Image" width="(\d+)%"`
+2. 通过图片行号向上查找最近的题号行，确定归属题目
+3. 通过 `【参考答案】`/`【实战解析】` 等标记判断图片在题干区还是解析区
+4. 仅下载题干区图片到本地（解析区图片通常为解题示意图，可按需保留）
+5. 文件名规范：`p{套号2位}_q{题号2位}_{序号}.jpg`，如 `p01_q04_1.jpg`

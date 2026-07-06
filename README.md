@@ -72,7 +72,8 @@
 - **同步练习记录**：做题记录自动写入 `exercise_history.json`，在列表视图和分类聚合页显示"本地题库"标签；列表视图标题显示为「一级题库名 + 题目数量」（如"【1】片段阅读600题题库 · 50题"），旧缓存通过 recordId 三级回填 source
 - **同步错题本**：错题自动写入 `wrong_q_local_quiz.json`，兼容现有错题本格式
 - **PDF 导出**：结果页一键导出错题+疑题为 PDF（复用 pdfGenerator）；题套列表页每行新增「导出 PDF」按钮，支持选范围、隐藏答案，带解析导出文件名追加「（解析）」
-- **逻辑推理图片**：支持渲染题目图片（imageUrl 字段）
+- **题目图片**：支持题干配图（imageUrl 字段）与解析配图（analysisImageUrl 字段）；xlsx 中填相对路径（如 `images/p01_q04_1.jpg`）配合题库目录下 `images/` 子目录 + 服务端 `/quiz-img/:source/*` 路由访问；多图用 `|` 分隔；绝对 URL（http/https）直接渲染
+- **LaTeX 公式渲染**：题干、选项、解析中的 LaTeX 公式通过 KaTeX 0.16.9 渲染（资源本地化于 `src/views/js/katex/`，无 CDN 依赖）；支持 `$...$` 行内、`$$...$$` 块级、`\(...\)`、`\[...\]` 四种分隔符
 
 ### 本地题库上传与卸载
 - **上传题库**：题库列表页右上角「+ 上传题库」按钮，选择文件夹即可批量上传 xlsx / apkg 文件
@@ -136,7 +137,7 @@ fenbi-helper-master/
 │       ├── quiz-result.ejs       # 本地题库结果页
 │       ├── setup.ejs             # 登录页
 │       ├── theme.css             # 全局主题
-│       └── js/                   # 前端静态资源（echarts、easymde 等）
+│       └── js/                   # 前端静态资源（echarts、easymde、katex 等）
 ├── fonts/                         # PDF 中文字体
 ├── fenbi-helper-design/          # 设计稿
 ├── cache/                        # 本地缓存（已 gitignore，含敏感数据）
@@ -186,6 +187,7 @@ node src/app.js
 | `/quiz/custom` | 自定义出题（勾选题套 + 数量，Fisher-Yates 抽样） |
 | `/quiz/:setId` | 本地题库做题页 |
 | `/quiz-result/:recordId` | 本地题库结果页 |
+| `/quiz-img/:source/*` | 题库图片静态服务（题库目录下 images/ 子目录，防路径穿越） |
 | `/setup` | 登录页 |
 | `/api/wrong-questions/pdf` | 导出错题本 PDF |
 | `/api/exercises/export-pdf` | 按练习记录批量导出错题/未写题目 PDF |
@@ -218,6 +220,8 @@ node src/app.js
 - 页面返回通过 `?from=` 参数 + 白名单校验，防开放重定向
 - 多选题识别统一使用正则 `/多(选|项)/`，兼容"多选"、"多项选择"等变体（前端、后端、quizLoader 三处一致）
 - Koa-router 静态路径必须在参数路径之前注册（如 `/quiz/custom` 必须在 `/quiz/:setId` 之前），否则 "custom" 会被当作 setId 参数
+- EJS 模板必须以 `<!DOCTYPE html>` 开头，否则浏览器进入 quirks mode，KaTeX 检测到后拒绝渲染
+- 题库图片字段（imageUrl / analysisImageUrl）支持绝对 URL（http/https 直接渲染）与相对路径（配合 `/quiz-img/:source/*` 路由）；多图用 `|` 分隔
 
 ## 部署
 
@@ -231,7 +235,7 @@ docker run -d -p 3000:3000 -v $(pwd)/cache:/app/cache fenbi-helper
 
 ## 历史更新
 
-- **2026-07-06** 项目更名为「错题助手」；本地题库题套列表新增「导出 PDF」按钮（沿用错题本导出逻辑，支持选题号范围与隐藏答案，带解析导出文件名追加「（解析）」）；新增后端路由 `/api/quiz/export-set-pdf` 按 setId 导出整套题；修正原 `/api/quiz/export-pdf` 单选题答案字母转换（correctAnswer.choice 直接传字母而非 indexOf 数字）；新增本地题库上传/卸载功能（支持 xlsx/apkg 文件夹上传，保留原始文件夹名，配置持久化到 uploaded-quizzes/config.json）；新增自定义出题（题套勾选 + Fisher-Yates 随机抽样 + 二级界面全选按键）；新增多选题支持（识别正则统一为 /多(选|项)/，前端多选交互不自动跳转，后端判分排序）；列表视图标题改为一级题库名+题目数量（旧缓存通过 recordId 三级回填 source）；解析展示压缩空白避免大量空行；新增 standard-quiz-builder skill 用于生成符合规范的 xlsx/apkg 题库
+- **2026-07-06** 项目更名为「错题助手」；本地题库题套列表新增「导出 PDF」按钮（沿用错题本导出逻辑，支持选题号范围与隐藏答案，带解析导出文件名追加「（解析）」）；新增后端路由 `/api/quiz/export-set-pdf` 按 setId 导出整套题；修正原 `/api/quiz/export-pdf` 单选题答案字母转换（correctAnswer.choice 直接传字母而非 indexOf 数字）；新增本地题库上传/卸载功能（支持 xlsx/apkg 文件夹上传，保留原始文件夹名，配置持久化到 uploaded-quizzes/config.json）；新增自定义出题（题套勾选 + Fisher-Yates 随机抽样 + 二级界面全选按键）；新增多选题支持（识别正则统一为 /多(选|项)/，前端多选交互不自动跳转，后端判分排序）；列表视图标题改为一级题库名+题目数量（旧缓存通过 recordId 三级回填 source）；解析展示压缩空白避免大量空行；新增 standard-quiz-builder skill 用于生成符合规范的 xlsx/apkg 题库；新增题库图片支持（imageUrl / analysisImageUrl 字段 + `/quiz-img/:source/*` 静态路由 + 防路径穿越）；新增 LaTeX 公式渲染（KaTeX 0.16.9 资源本地化于 `src/views/js/katex/`，支持题干/选项/解析中的 `$...$`、`$$...$$`、`\(\)`、`\[]` 公式）；修复 4 个 EJS 模板缺 `<!DOCTYPE html>` 导致浏览器 quirks mode 使 KaTeX 拒绝渲染的问题；404 中间件对 `/api/` 路径返回 JSON 而非重定向到 HTML
 - **2026-07-05** 新增本地题库刷题模块：内置片段阅读 436 题 + 逻辑推理 600 题共 1036 题；做题页支持单题作答、总计时器、标记疑题、题号导航；结果页含对错高亮、疑题标记、解析展开；做题记录自动同步至练习记录列表和分类聚合页（"本地题库"标签）；错题自动同步至错题本；结果页支持一键导出错题+疑题 PDF
 - **2026-07-04** 新增申论公文格式模块（33 文种，三级卡片式浏览，含格式示意）；练习记录按 id 去重（修复跨分类重复）；练习记录多选导出错题/未写题目 PDF；热力图与分类模块滚动条优化；视频解析非会员容错（无视频自动隐藏按钮不报错）；导航栏统一补齐列表视图
 - **2026-07-03** 成语词典 CSV 集成；词语统计缓存策略（15 天 + 手动更新）；错题词语关联卡片重设计；正确答案高亮；页面返回逻辑（从哪来回哪去）；PDF 排版优化（智能选项布局、绝对 Y 坐标）

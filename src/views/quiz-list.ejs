@@ -946,13 +946,19 @@ function submitUpload() {
         showResult('error', '✗ ' + (res.message || '上传失败'));
       }
     } catch (e) {
-      showResult('error', '✗ 解析响应失败：' + xhr.responseText);
+      var snippet = (xhr.responseText || '').slice(0, 500);
+      showResult('error', '✗ 解析响应失败（HTTP ' + xhr.status + ' ' + xhr.statusText + '）：<pre style="white-space:pre-wrap;word-break:break-all;margin:6px 0 0;font-size:12px;">' + snippet + '</pre>');
     }
   };
   xhr.onerror = function() {
     btn.disabled = false;
     btn.textContent = '开始上传';
-    showResult('error', '✗ 网络错误，上传失败');
+    showResult('error', '✗ 网络错误，上传失败（可能是请求体过大或连接被重置）');
+  };
+  xhr.ontimeout = function() {
+    btn.disabled = false;
+    btn.textContent = '开始上传';
+    showResult('error', '✗ 请求超时');
   };
   xhr.send(fd);
 }

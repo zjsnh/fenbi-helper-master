@@ -41,3 +41,5 @@
 
 ## 最近变更
 - 2026-07-06：项目更名为「错题助手」；本地题库题套新增 PDF 导出（/api/quiz/export-set-pdf），带解析文件名追加「（解析）」；修正原 /api/quiz/export-pdf 单选答案字母转换
+- 2026-07-06：题库图片支持——新增 `/quiz-img/:source/*` 静态路由服务 `local-quiz-bank/:source/*` 本地图片；quizLoader 新增 `解析图片URL` 字段解析（题干图 `图片URL` + 解析图 `解析图片URL`，多图用 `|` 分隔）；quiz-play.ejs / quiz-result.ejs 渲染题干图与解析图（相对路径自动转 `/quiz-img/` URL）；404 中间件对 `/api/` 路径返回 JSON `{code:404, message:'接口不存在'}` 而非重定向 HTML，避免前端 JSON.parse 失败
+- 2026-07-06：题库公式渲染——引入 KaTeX 0.16.9 渲染题干、选项、解析中的 LaTeX 公式；资源本地化到 `src/views/js/katex/`（含 CSS、JS、auto-render、60 个 woff2 字体），通过 `/js/katex/katex.min.css` 等路径引用，无网络依赖；quiz-play.ejs 在 renderQuestion() 中调用 renderMathInElement(card)（含异步加载后补渲染）；quiz-result.ejs 在页面加载后调用 renderMathInElement(document.body)；exerciseResult.ejs / question.ejs（粉笔练习详情页）同步引入 KaTeX；支持 `$...$` 行内、`$$...$$` 块级、`\(\)`、`\[]` 四种分隔符；throwOnError: false 避免错误中断；**关键修复**：4 个模板补全 `<!DOCTYPE html>` 声明，否则浏览器进入 quirks mode 导致 KaTeX 拒绝渲染
