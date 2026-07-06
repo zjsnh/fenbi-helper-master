@@ -1,11 +1,11 @@
 ---
 name: "standard-quiz-builder"
-description: "Generates standardized local quiz banks (xlsx/apkg) for the fenbi-helper project. Invoke when user asks to create, build, or convert question banks, design quiz templates, or standardize raw question data into the project's upload format."
+description: "Generates standardized local quiz banks (xlsx/apkg) for the fenbi-helper project, including extracting questions from PDF quiz books and converting them to the project's upload format. Invoke when user asks to create, build, or convert question banks, extract from PDF, design quiz templates, or standardize raw question data into the project's upload format."
 ---
 
 # Standard Quiz Builder · 标准题库生成器
 
-为粉笔助手项目（fenbi-helper）生成可直接上传到本地题库的标准题库文件。覆盖 **xlsx** 与 **apkg** 两种格式，确保字段、命名、多选规则全部对齐 [quizLoader.js](file:///d:/fenbi/fenbi-helper-master/src/util/quizLoader.js) 的解析逻辑。
+为粉笔助手项目（fenbi-helper）生成可直接上传到本地题库的标准题库文件。覆盖三种来源：**从零生成 xlsx/apkg**、**从 PDF 题库（含扫描版）提取并转换**、**双文件题目册+答案册合并**。所有输出严格对齐 [quizLoader.js](file:///d:/fenbi/fenbi-helper-master/src/util/quizLoader.js) 的解析逻辑。
 
 ---
 
@@ -219,7 +219,309 @@ print('已生成 apkg 文件')
 
 ---
 
-## 六、生成流程清单
+## 六、从 PDF 题库提取并转换（重要）
+
+### 适用场景
+
+许多教辅题库原始形态是 PDF：
+- **单文件 PDF**：题目、选项、答案、解析在同一份文档中（可能答案解析附在每题后，也可能集中在文末）
+- **双文件 PDF**：一本题目册 PDF + 一本答案册 PDF（最常见于纸质教辅扫描件）
+- **扫描版 PDF**：纯图片，无文本层，需 OCR
+
+**系统限制：** [quizLoader.js](file:///d:/fenbi/fenbi-helper-master/src/util/quizLoader.js) 只能加载 xlsx / apkg，**不能直接读 PDF**。必须先把 PDF 内容提取并转成本规范定义的 xlsx 格式，再上传。
+
+### 转换流程总览
+
+```
+PDF 题库 ──文本提取──> 结构化文本 ──正则/规则解析──> 题目对象数组 ──写入──> 标准 xlsx
+              ↑                                                            ↑
+       文本层 PDF：pdfplumber/PyMuPDF                         合并题目+答案（双文件场景）
+       扫描版 PDF：OCR（paddleocr/Tesseract）
+```
+
+### 第一步：PDF 文本提取
+
+#### 1.1 文本层 PDF（可复制文字的 PDF）
+
+推荐 Python `pdfplumber`（按行保留布局）或 `PyMuPDF`（速度更快）：
+
+```python
+# extract_pdf_text.py
+# 依赖：pip install pdfplumber
+import pdfplumber
+
+def extract_text(pdf_path, out_txt_path):
+    """提取 PDF 全文，保留分页与行结构"""
+    lines = []
+    with pdfplumber.open(pdf_path) as pdf:
+        for page_no, page in enumerate(pdf.pages, 1):
+            lines.append(f'=== 第 {page_no} 页 ===')
+            text = page.extract_text() or ''
+            for line in text.split('\n'):
+                lines.append(line.rstrip())
+    with open(out_txt_path, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines))
+    print(f'已提取 {pdf_path} -> {out_txt_path}，共 {len(lines)} 行')
+
+# 用法
+extract_text('题目册.pdf', '题目册.txt')
+extract_text('答案册.pdf', '答案册.txt')
+```
+
+**关键点：**
+- `extract_text()` 保留阅读顺序，适合单栏排版
+- 双栏排版用 `page.extract_text(layout=True)` 或按坐标分栏提取
+- 表格类内容用 `page.extract_tables()` 单独处理
+
+#### 1.2 扫描版 PDF（图片型，无文本层）
+
+需先 OCR，推荐 `PaddleOCR`（中文识别率高）：
+
+```python
+# ocr_pdf.py
+# 依赖：pip install paddlepaddle paddleocr pdf2image pillow
+# 系统依赖：poppler（pdf2image 需要）
+from paddleocr import PaddleOCR
+from pdf2image import convert_from_path
+import os
+
+def ocr_pdf(pdf_path, out_txt_path):
+    ocr = PaddleOCR(use_angle_cls=True, lang='ch', show_log=False)
+    images = convert_from_path(pdf_path, dpi=300)
+    lines = []
+    for i, img in enumerate(images, 1):
+        img_path = f'_tmp_page_{i}.png'
+        img.save(img_path, 'PNG')
+        result = ocr.ocr(img_path, cls=True)
+        lines.append(f'=== 第 {i} 页 ===')
+        if result and result[0]:
+            for line in result[0]:
+                text = line[1][0]
+                lines.append(text)
+        os.remove(img_path)
+    with open(out_txt_path, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines))
+    print(f'OCR 完成: {pdf_path} -> {out_txt_path}')
+
+ocr_pdf('扫描题目册.pdf', '题目册.txt')
+```
+
+**OCR 注意事项：**
+- DPI 建议 300，低于 200 识别率明显下降
+- OCR 后**必须人工抽检**，常见错误：`A` 识别为 `4`、`B` 识别为 `8`、`〇` 与 `O` 混淆
+- 选项字母前的点号可能丢失，后续正则需宽松匹配
+
+### 第二步：题目结构化解析
+
+从提取的文本中按规则切分出每道题的字段。不同题库排版差异大，**需根据实际样张调整正则**，以下为通用模板：
+
+```python
+# parse_questions.py
+import re
+
+def parse_quiz_text(txt_path):
+    """从题目册文本解析出题目列表"""
+    with open(txt_path, 'r', encoding='utf-8') as f:
+        text = f.read()
+
+    # 去除页眉页脚（按实际样张调整）
+    text = re.sub(r'=== 第 \d+ 页 ===', '', text)
+    text = re.sub(r'.*?\d+/\d+.*', '', text)  # 形如 "12/100" 的页码
+
+    questions = []
+    # 题号开头：1. / 1、 / （一） / 1)
+    # 注意：题号正则需匹配实际排版，常见有 "1." "1、" "1）" "(1)" 等
+    q_pattern = re.compile(
+        r'(?:^|\n)\s*(?P<no>\d{1,3})\s*[\.、）\)]\s*(?P<stem>.*?)(?=(?:\n\s*\d{1,3}\s*[\.、）\)])|\Z)',
+        re.DOTALL
+    )
+
+    for m in q_pattern.finditer(text):
+        block = m.group('stem')
+        q_no = m.group('no')
+
+        # 选项识别：A. / A、 / A) / A）
+        opt_pattern = re.compile(
+            r'([A-F])\s*[\.、）\)]\s*(.*?)(?=(?:\n\s*[A-F]\s*[\.、）\)])|\Z)',
+            re.DOTALL
+        )
+        options = {}
+        for om in opt_pattern.finditer(block):
+            letter = om.group(1)
+            opt_text = om.group(2).strip().replace('\n', ' ')
+            options[letter] = opt_text
+
+        # 题干 = block 去掉选项部分后的剩余
+        first_opt_pos = block.find('A.')
+        if first_opt_pos < 0:
+            first_opt_pos = block.find('A、')
+        stem = block[:first_opt_pos].strip().replace('\n', ' ') if first_opt_pos > 0 else block.strip().replace('\n', ' ')
+
+        # 题型推断：选项 5-6 个或题干含"多项""多选"
+        q_type = '单选'
+        if len(options) > 4 or '多选' in stem or '多项' in stem:
+            q_type = '多选'
+
+        questions.append({
+            '题号': q_no,
+            '题型': q_type,
+            '题干': stem,
+            '选项A': options.get('A', ''),
+            '选项B': options.get('B', ''),
+            '选项C': options.get('C', ''),
+            '选项D': options.get('D', ''),
+            '选项E': options.get('E', ''),
+            '选项F': options.get('F', ''),
+        })
+    return questions
+
+def parse_answer_text(txt_path):
+    """从答案册文本解析出答案映射：题号 -> {答案, 解析}"""
+    with open(txt_path, 'r', encoding='utf-8') as f:
+        text = f.read()
+
+    answers = {}
+    # 答案行常见格式："1. A" "1、ACD" "1. A 解析：..." "1. A 【解析】..."
+    ans_pattern = re.compile(
+        r'(?:^|\n)\s*(?P<no>\d{1,3})\s*[\.、）\)]\s*(?P<ans>[A-Fa-f]+)\s*(?:[:：】\s]*|\s*【?解析】?\s*[:：]?\s*)(?P<analysis>.*?)(?=(?:\n\s*\d{1,3}\s*[\.、）\)])|\Z)',
+        re.DOTALL
+    )
+    for m in ans_pattern.finditer(text):
+        no = m.group('no')
+        ans = m.group('ans').upper()
+        analysis = m.group('analysis').strip().replace('\n', ' ')
+        answers[no] = {'答案': ans, '解析': analysis}
+    return answers
+```
+
+**解析规则需根据样张调整的关键点：**
+- 题号正则：`1.` `1、` `1）` `(1)` `（一）` 等排版差异
+- 选项标识：`A.` `A、` `A)` `A）` `（A）` 等
+- 答案行：`1.A` `1、A` `1. A 解析：xxx` `1. A【解析】xxx`
+- 多选题题型推断：选项数 > 4、题干含"多选/多项"、答案含多个字母
+- 解析可能跨行，需合并到一行（写入 xlsx 时换行会被压缩）
+
+### 第三步：题目与答案合并
+
+```python
+def merge_quiz_and_answer(quiz_list, answer_map):
+    """合并题目列表与答案映射，未匹配的题目告警"""
+    merged = []
+    unmatched = []
+    for q in quiz_list:
+        no = q['题号']
+        ans_info = answer_map.get(no)
+        if not ans_info:
+            unmatched.append(no)
+            q['答案'] = ''
+            q['解析'] = ''
+            q['知识点'] = ''
+        else:
+            q['答案'] = ans_info['答案']
+            q['解析'] = ans_info['解析']
+            q['知识点'] = ''
+        merged.append(q)
+    if unmatched:
+        print(f'警告：{len(unmatched)} 题未找到答案，题号: {unmatched}')
+    return merged
+```
+
+**合并键选择：**
+- 题目册与答案册都含「题号」→ 按题号匹配（推荐，最稳）
+- 两本题目顺序、数量完全一致 → 按索引匹配（兜底方案）
+- 题号含套号（如 `1-1`、`2-15`）→ 用完整键匹配
+
+### 第四步：写入标准 xlsx
+
+```python
+# write_xlsx.py
+# 依赖：pip install openpyxl 或 pip install xlsxwriter
+from openpyxl import Workbook
+
+HEADER = ['题号', '题型', '题干', '选项A', '选项B', '选项C', '选项D', '选项E', '选项F', '答案', '解析', '知识点', '图片URL']
+
+def write_to_xlsx(questions, out_path):
+    wb = Workbook()
+    ws = wb.active
+    ws.append(HEADER)
+    for q in questions:
+        ws.append([
+            q.get('题号', ''),
+            q.get('题型', '单选'),
+            q.get('题干', ''),
+            q.get('选项A', ''),
+            q.get('选项B', ''),
+            q.get('选项C', ''),
+            q.get('选项D', ''),
+            q.get('选项E', ''),
+            q.get('选项F', ''),
+            q.get('答案', ''),
+            q.get('解析', ''),
+            q.get('知识点', ''),
+            q.get('图片URL', ''),
+        ])
+    wb.save(out_path)
+    print(f'已写入 {out_path}，共 {len(questions)} 题')
+```
+
+### 完整流程脚本（单文件版）
+
+```python
+# pdf_to_xlsx.py - PDF 题库一键转 xlsx
+import pdfplumber
+import re
+from openpyxl import Workbook
+
+def pdf_to_xlsx(pdf_path, out_xlsx_path, mode='single'):
+    """
+    mode:
+      'single'  - 单文件 PDF，题目与答案在同一文档
+      'double'  - 双文件 PDF，需另外提供答案册路径
+    """
+    # 1. 提取文本
+    lines = []
+    with pdfplumber.open(pdf_path) as pdf:
+        for page in pdf.pages:
+            lines.append(page.extract_text() or '')
+    text = '\n'.join(lines)
+
+    # 2. 解析题目（用上面的 parse_quiz_text 逻辑）
+    questions = parse_quiz_text_inline(text)
+
+    # 3. 单文件模式：从同一文本提取答案
+    if mode == 'single':
+        answer_map = parse_answer_text_inline(text)
+        for q in questions:
+            ans_info = answer_map.get(q['题号'], {'答案': '', '解析': ''})
+            q['答案'] = ans_info['答案']
+            q['解析'] = ans_info['解析']
+
+    # 4. 写入 xlsx
+    wb = Workbook()
+    ws = wb.active
+    ws.append(['题号', '题型', '题干', '选项A', '选项B', '选项C', '选项D', '选项E', '选项F', '答案', '解析', '知识点', '图片URL'])
+    for q in questions:
+        ws.append([q.get(k, '') for k in ['题号','题型','题干','选项A','选项B','选项C','选项D','选项E','选项F','答案','解析','知识点','图片URL']])
+    wb.save(out_xlsx_path)
+    print(f'转换完成: {pdf_path} -> {out_xlsx_path} ({len(questions)} 题)')
+```
+
+### PDF 提取转换检查清单
+
+- [ ] 确认 PDF 类型：文本层 PDF / 扫描版 PDF（决定用 extract_text 还是 OCR）
+- [ ] 确认排版：单栏 / 双栏 / 表格（影响提取策略）
+- [ ] 确认结构：单文件含答案 / 双文件题目+答案分离
+- [ ] 抽样人工核对前 5 题与末 5 题，确认题号、题干、选项、答案、解析全部对齐
+- [ ] 多选题题型字段含「多选」或「多项」
+- [ ] 答案字母全大写，多选答案为字母组合
+- [ ] 解析文本压缩为单行（避免 xlsx 单元格内换行被渲染为空白）
+- [ ] 输出 xlsx 表头严格匹配规范：题号 / 题型 / 题干 / 选项A~F / 答案 / 解析 / 知识点 / 图片URL
+- [ ] 文件命名含数字段，多套题按序号递增
+- [ ] 上传 `/quiz` 验证：题套数正确、每题有答案与解析、多选题交互正常
+
+---
+
+## 七、生成流程清单
 
 生成标准题库时按以下步骤逐项检查：
 
@@ -234,7 +536,7 @@ print('已生成 apkg 文件')
 
 ---
 
-## 七、验证与调试
+## 八、验证与调试
 
 生成并上传后，可在以下位置验证：
 
