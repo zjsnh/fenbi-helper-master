@@ -5,7 +5,7 @@ description: "Generates standardized local quiz banks (xlsx/apkg) for the fenbi-
 
 # Standard Quiz Builder · 标准题库生成器
 
-为粉笔助手项目（fenbi-helper）生成可直接上传到本地题库的标准题库文件。覆盖三种来源：**从零生成 xlsx/apkg**、**从 PDF 题库（含扫描版）提取并转换**、**双文件题目册+答案册合并**。所有输出严格对齐 [quizLoader.js](file:///d:/fenbi/fenbi-helper-master/src/util/quizLoader.js) 的解析逻辑。
+为错题助手项目（fenbi-helper）生成可直接上传到本地题库的标准题库文件。覆盖三种来源：**从零生成 xlsx/apkg**、**从 PDF 题库（含扫描版）提取并转换**、**双文件题目册+答案册合并**。所有输出严格对齐 [quizLoader.js](file:///d:/fenbi/fenbi-helper-master/src/util/quizLoader.js) 的解析逻辑。
 
 ---
 

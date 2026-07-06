@@ -245,7 +245,7 @@
   "config": {
     "autoLayout": false,
     "deviceType": "tablet",
-    "projectName": "粉笔刷题助手",
+    "projectName": "错题助手",
     "designLibrary": {
       "name": "苹果",
       "id": "dl_builtin_apple",

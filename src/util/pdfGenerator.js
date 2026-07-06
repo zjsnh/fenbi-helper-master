@@ -612,7 +612,7 @@ async function generateWrongQuestionsPDF(options) {
       margin: 0,
       size: 'A4',
       bufferPages: true,
-      info: { Title: categoryName + ' - 错题本', Author: '粉笔助手' },
+      info: { Title: categoryName + ' - 错题本', Author: '错题助手' },
     });
 
     const buf = [];
@@ -744,7 +744,7 @@ async function generateDailyWrongStatsPDF(stats, options) {
       margin: 0,
       size: 'A4',
       bufferPages: true,
-      info: { Title: date + ' 当日错题', Author: '粉笔助手' },
+      info: { Title: date + ' 当日错题', Author: '错题助手' },
     });
 
     const buf = [];
