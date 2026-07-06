@@ -52,6 +52,7 @@ cache/
 
 # 临时测试脚本
 test_*.js
+test_*.py
 _extract_pdf.js
 _debug_*.js
 
