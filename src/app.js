@@ -301,9 +301,16 @@ router.post('/quiz/:setId/submit', async ctx => {
     const body = ctx.request.body;
     const answers = body.answers || {};          // { qNo: 'A' }
     const flaggedSet = new Set((body.flagged || []).map(n => Number(n)));
-    const startTime = body.startTime || Date.now();
-    const endTime = body.endTime || Date.now();
-    const durationMs = body.durationMs || (endTime - startTime);
+    // 规范化时间戳：部分环境下 body.endTime 可能是 .NET ticks（18位），需转为 Unix ms（13位）
+    function normTs(ts) {
+        ts = Number(ts);
+        if (!ts || isNaN(ts)) return Date.now();
+        if (ts > 1e15) return Math.floor((ts - 621355968000000000) / 10000); // .NET ticks → Unix ms
+        return ts;
+    }
+    const startTime = normTs(body.startTime);
+    const endTime = normTs(body.endTime);
+    const durationMs = body.durationMs ? Number(body.durationMs) : (endTime - startTime);
 
     // 判分
     let correctCount = 0, wrongCount = 0, unansweredCount = 0;
@@ -313,6 +320,24 @@ router.post('/quiz/:setId/submit', async ctx => {
         return Array.from(new Set(letters)).sort().join('');
     };
     const questions = set.questions.map(q => {
+        // 无选项题（填空/解答题）：不参与判分，标记为 null（不计入对错与未答）
+        if (!q.options || q.options.length === 0) {
+            return {
+                uid: q.uid,
+                qNo: q.qNo,
+                type: q.type,
+                stem: q.stem,
+                options: q.options,
+                answer: q.answer,
+                myAnswer: '',
+                correct: null,
+                flagged: flaggedSet.has(q.qNo),
+                analysis: q.analysis,
+                knowledge: q.knowledge,
+                imageUrl: q.imageUrl,
+                analysisImageUrl: q.analysisImageUrl || ''
+            };
+        }
         let myAnswer = answers[q.qNo] || '';
         // 多选题：用户答案排序后再比较
         if (isMulti(q.type)) {
@@ -401,6 +426,79 @@ router.post('/quiz/:setId/submit', async ctx => {
 
     console.log('Quiz 提交: ' + set.setName + ' 正确率=' + accuracy + '% 用时=' + durationDesc);
     ctx.body = { recordId, accuracy, correctCount, wrongCount, unansweredCount };
+});
+
+// 当日错题重做：从指定日期（可选指定练习）的错题构建重做题集，跳转到 quiz-play 页面
+router.post('/api/quiz/redo', async ctx => {
+    let cookie = ctx.request.headers['cookie'];
+    if (!cookie || !cookie.includes('userid')) {
+        ctx.body = { error: '请先登录' };
+        ctx.status = 401;
+        return;
+    }
+    try {
+        const { date, exerciseIds } = ctx.request.body;
+        if (!date) {
+            ctx.body = { error: '请提供日期' };
+            ctx.status = 400;
+            return;
+        }
+        console.log('当日错题重做: date=' + date + (Array.isArray(exerciseIds) && exerciseIds.length > 0 ? ', exerciseIds=' + exerciseIds.join(',') : ''));
+        const stats = await exerciseResult.getDailyWrongStats(date, cookie, exerciseIds);
+        if (!stats.questions || stats.questions.length === 0) {
+            ctx.body = { error: '所选范围无错题数据' };
+            ctx.status = 404;
+            return;
+        }
+
+        // 将错题转为 quiz-play 格式
+        function normAnswer(ans) {
+            let val = (ans && typeof ans === 'object') ? ans.choice : ans;
+            if (val === 'A' || val === 'B' || val === 'C' || val === 'D' || val === 'E' || val === 'F') return val;
+            if (val === 0 || val === '0') return 'A';
+            if (val === 1 || val === '1') return 'B';
+            if (val === 2 || val === '2') return 'C';
+            if (val === 3 || val === '3') return 'D';
+            if (val === 4 || val === '4') return 'E';
+            if (val === 5 || val === '5') return 'F';
+            return '';
+        }
+        // 去除选项中的 HTML 标签（粉笔选项可能含 <p> 等）
+        function stripHtml(s) {
+            return String(s || '').replace(/<[^>]+>/g, '').trim();
+        }
+
+        const questions = stats.questions.map((q, i) => ({
+            uid: '',
+            setId: '',
+            source: q.source || '错题重做',
+            qNo: i + 1,
+            type: '单选',
+            stem: q.content || '',
+            options: (q.options || []).map(opt => typeof opt === 'string' ? stripHtml(opt) : stripHtml(opt.content || opt.text || String(opt))),
+            answer: normAnswer(q.correctAnswer),
+            analysis: q.solution || '',
+            knowledge: Array.isArray(q.keypoints) ? q.keypoints.join('、') : (q.knowledge || ''),
+            imageUrl: '',
+            analysisImageUrl: ''
+        })).filter(q => q.stem && q.options.length > 0 && q.answer);
+
+        if (questions.length === 0) {
+            ctx.body = { error: '错题数据解析失败，无法重做' };
+            ctx.status = 404;
+            return;
+        }
+
+        const customId = 'custom_redo_' + date + '_' + Date.now();
+        const setName = '错题重做(' + date + (Array.isArray(exerciseIds) && exerciseIds.length > 0 ? ' 所选' + exerciseIds.length + '个练习' : ' 当日') + ') · ' + questions.length + '题';
+        quizLoader.registerCustomSet(customId, '错题重做', setName, questions);
+        console.log('错题重做题集已注册: ' + customId + ', ' + questions.length + ' 题');
+        ctx.body = { setId: customId, questionCount: questions.length };
+    } catch (e) {
+        console.error('错题重做失败:', e.message, e.stack);
+        ctx.body = { error: '构建重做题集失败: ' + e.message };
+        ctx.status = 500;
+    }
 });
 
 function formatDuration(ms) {
@@ -566,24 +664,28 @@ router.post('/api/quiz/upload-folder', async ctx => {
         const folderNameRaw = (ctx.request.body.folderName || '').trim();
 
         if (fileList.length === 0) {
-            ctx.body = { code: 400, message: '未收到任何文件，请选择包含 xlsx 或 apkg 的文件夹' };
+            ctx.body = { code: 400, message: '未收到任何文件，请选择包含 xlsx / apkg / md 的文件夹' };
             return;
         }
 
         // 仅保留目标扩展名文件
         const validFiles = fileList.filter(f => {
             const n = (f.name || '').toLowerCase();
-            return n.endsWith('.xlsx') || n.endsWith('.apkg');
+            return n.endsWith('.xlsx') || n.endsWith('.apkg') || n.endsWith('.md');
         });
         if (validFiles.length === 0) {
-            ctx.body = { code: 400, message: '文件夹内未发现 .xlsx 或 .apkg 文件' };
+            ctx.body = { code: 400, message: '文件夹内未发现 .xlsx / .apkg / .md 文件' };
             return;
         }
 
         // 检测主扩展名（取数量多的那种）
         const xlsxCount = validFiles.filter(f => f.name.toLowerCase().endsWith('.xlsx')).length;
-        const apkgCount = validFiles.length - xlsxCount;
-        const ext = xlsxCount >= apkgCount ? 'xlsx' : 'apkg';
+        const apkgCount = validFiles.filter(f => f.name.toLowerCase().endsWith('.apkg')).length;
+        const mdCount = validFiles.filter(f => f.name.toLowerCase().endsWith('.md')).length;
+        let ext;
+        if (mdCount >= xlsxCount && mdCount >= apkgCount) ext = 'md';
+        else if (xlsxCount >= apkgCount) ext = 'xlsx';
+        else ext = 'apkg';
 
         // 过滤出对应扩展名的文件（混合时只取主类型，其余忽略）
         const targetFiles = validFiles.filter(f => f.name.toLowerCase().endsWith('.' + ext));
@@ -1051,19 +1153,19 @@ router.post('/api/export-daily-wrong-pdf', async ctx => {
     }
 
     try {
-        const { date } = ctx.request.body;
+        const { date, exerciseIds } = ctx.request.body;
         if (!date) {
             ctx.body = { error: '请提供日期' };
             ctx.status = 400;
             return;
         }
-        console.log('当日错题统计: date=' + date);
+        console.log('当日错题统计: date=' + date + (Array.isArray(exerciseIds) && exerciseIds.length > 0 ? ', exerciseIds=' + exerciseIds.join(',') : ''));
         const pdfGenerator = require('./util/pdfGenerator');
 
-        const stats = await exerciseResult.getDailyWrongStats(date, cookie);
+        const stats = await exerciseResult.getDailyWrongStats(date, cookie, exerciseIds);
 
         if (!stats.questions || stats.questions.length === 0) {
-            ctx.body = { error: '该日期无错题数据' };
+            ctx.body = { error: '所选范围无错题数据' };
             ctx.status = 404;
             return;
         }
@@ -1071,7 +1173,8 @@ router.post('/api/export-daily-wrong-pdf', async ctx => {
         const pdfBuffer = await pdfGenerator.generateDailyWrongStatsPDF(stats, { hideAnswer: true });
 
         ctx.set('Content-Type', 'application/pdf');
-        ctx.set('Content-Disposition', `inline; filename="wrong-stats-${date}.pdf"`);
+        const fileName = date + (Array.isArray(exerciseIds) && exerciseIds.length > 0 ? '-错题(所选' + exerciseIds.length + '个练习)' : '-当日错题') + '.pdf';
+        ctx.set('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`);
         ctx.body = pdfBuffer;
     } catch (e) {
         console.error('当日错题PDF生成失败:', e.message);

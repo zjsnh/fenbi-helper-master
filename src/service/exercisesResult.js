@@ -36,6 +36,12 @@ async function getCategories(group, cookie) {
         rels.push({type: '每日演练', items: daily, childTypes: []});
     }
 
+    // 本地题库单独成组（不依赖粉笔分类树）
+    let localQuiz = group['本地题库'] || [];
+    if (localQuiz.length > 0) {
+        rels.push({type: '本地题库', items: localQuiz, childTypes: []});
+    }
+
     let others = (group['others'] || []).filter(i => i.answerCount > 30);
     if (others.length > 0) {
         rels.push({type: '试卷', items: others, childTypes: []});
@@ -420,9 +426,39 @@ exports.getExerciseHistory = async function (cookie, forceRefresh) {
             }
         }
     });
+
+    // 合并本地题库记录（从 quiz_records 缓存读取，避免刷新时丢失）
+    const quizRecord = require('../util/quizRecord');
+    const localRecords = quizRecord.readAll().map(r => {
+        // 规范化 updatedTime：部分旧记录存了 .NET ticks（18位），需转为 Unix ms（13位）
+        let updatedTime = r.updatedTime;
+        if (updatedTime && updatedTime > 1e15) {
+            updatedTime = Math.floor((updatedTime - 621355968000000000) / 10000);
+        }
+        // 修复 finishedTime/finishedDate（旧记录可能为 "Invalid date"）
+        let finishedTime = r.finishedTime;
+        let finishedDate = r.finishedDate;
+        if (!finishedTime || finishedTime === 'Invalid date') {
+            finishedTime = moment(updatedTime).format('YYYY-MM-DD HH:mm:ss');
+        }
+        if (!finishedDate || finishedDate === 'Invalid date') {
+            finishedDate = moment(updatedTime).format('YYYY-MM-DD');
+        }
+        return { ...r, updatedTime, finishedTime, finishedDate };
+    });
+    if (localRecords.length > 0) {
+        exerciseHistory = exerciseHistory.concat(localRecords);
+        // 重新按 updatedTime 降序排序
+        exerciseHistory = _.orderBy(exerciseHistory, ['updatedTime'], ['desc']);
+    }
+
     exerciseHistory = exerciseHistory.filter(h => h.status === 1 && h.answerCount > 0);
     let exerciseHistoryGroup = _.groupBy(exerciseHistory, h => {
         let name = (h.sheet && h.sheet.name) || '';
+        if (h._isLocalQuiz) {
+            h.cleanName = name;
+            return '本地题库';
+        }
         if (name.startsWith('专项智能练习')) {
             h.cleanName = name.replace(/(专项智能练习)（(.*)）/, '$1');
             return name.replace(/专项智能练习（(.*)）/, '$1');
@@ -795,7 +831,8 @@ exports.addCollect = async function (questionId, cookie) {
 }
 
 // 按日期统计当日错题：错题列表 + 关联词语统计
-exports.getDailyWrongStats = async function (date, cookie) {
+// exerciseIds 可选：指定练习 ID 数组，仅统计这些练习的错题（未提供则统计当天全部）
+exports.getDailyWrongStats = async function (date, cookie, exerciseIds) {
     // 读取练习记录缓存
     let cached = cache.readCache('exercise_history');
     if (!cached || !cached.data || !cached.data.exerciseHistory) {
@@ -804,6 +841,11 @@ exports.getDailyWrongStats = async function (date, cookie) {
     let exerciseHistory = cached.data.exerciseHistory;
     // 筛选当天完成的练习（按 finishedDate 字符串比对，避免时区问题）
     let dayItems = exerciseHistory.filter(h => h.finishedDate === date);
+    // 若指定了 exerciseIds，进一步过滤（同时兼容字符串与数字 ID）
+    if (Array.isArray(exerciseIds) && exerciseIds.length > 0) {
+        const idSet = new Set(exerciseIds.map(id => String(id)));
+        dayItems = dayItems.filter(h => idSet.has(String(h.id)));
+    }
     if (dayItems.length === 0) {
         return { date, questions: [], wordStatsList: [] };
     }

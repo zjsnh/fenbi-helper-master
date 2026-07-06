@@ -21,6 +21,8 @@
 - 错题本 PDF 导出：题号深蓝醒目、题干加粗、选项中性灰，弱化装饰突出题目本身
 - 题目内可写笔记、收藏、造句查询
 - **当日错题 PDF**：按日期导出当日错题，含逻辑填空词语统计页
+- **按练习勾选导出/重做**：列表视图每个练习前含复选框，勾选后「导出当日错题」「重做当日错题」按钮切换为「导出所选错题 N」「重做所选错题 N」高亮态，仅针对所选练习筛选错题
+- **当日错题重做**：将当日错题（可选按练习过滤）转为 quiz-play 题集，跳转做题页直接重做，提交后判分与本地题库一致
 
 ### 词语频次统计
 - 全错题本逻辑填空题选项词语自动提取
@@ -76,13 +78,14 @@
 - **apkg 题库图片**：parseApkgFile 自动解压 apkg 内 `media` 映射的图片文件到题库目录 `images/` 子目录，题干/解析 HTML 中的相对路径 `src` 自动重写为 `/quiz-img/{source}/images/xxx.png` 绝对路径；`/quiz-img/:source/*` 路由依次在 `local-quiz-bank/` 和 `uploaded-quizzes/` 下查找
 - **题干 HTML 渲染**：apkg 题库（如资料分析）题干含 `<div>/<b>/<br>/<img>` 等 HTML 标签，quiz-play.ejs / quiz-result.ejs 题干直接 innerHTML 渲染（不做 HTML 转义），结果页题干预览自动去标签
 - **LaTeX 公式渲染**：题干、选项、解析中的 LaTeX 公式通过 KaTeX 0.16.9 渲染（资源本地化于 `src/views/js/katex/`，无 CDN 依赖）；支持 `$...$` 行内、`$$...$$` 块级、`\(...\)`、`\[...\]` 四种分隔符
+- **无选项题（填空/解答题）**：通过 `q.options.length === 0` 识别；做题页不渲染选项区与标记疑题按钮，改为「▸ 显示答案」按钮 + 答案/解析面板（默认隐藏，点击展开 KaTeX 自动补渲染）；导航点用淡紫色独立样式；提交判分时无选项题跳过判分（`correct = null` 不计入对错与未答）；结果页状态显示「已查看」紫色徽章，答案行改为「参考答案：xxx」；支持 Markdown 题库（`### 第 X 题` 拆题 + `**考点**/**题目**/**答案**/**解析**` 字段提取，`## 填空题/解答题/选择题` 二级标题切换题型）
 
 ### 本地题库上传与卸载
-- **上传题库**：题库列表页右上角「+ 上传题库」按钮，选择文件夹即可批量上传 xlsx / apkg 文件
+- **上传题库**：题库列表页右上角「+ 上传题库」按钮，选择文件夹即可批量上传 xlsx / apkg / md 文件
 - **保留原始文件夹名**：上传时以原始文件夹名作为磁盘存储目录名，不自动重命名、不加时间戳
 - **动态加载**：上传后自动加载到题库列表，无需重启服务；配置持久化到 `uploaded-quizzes/config.json`
 - **卸载题库**：分类卡片 hover 显示「✕」卸载按钮，仅对上传题库生效，内置题库不可卸载
-- **格式规范弹窗**：上传弹窗含详细 xlsx 表头规范（题干/选项A~F/答案/题型/解析/知识点/图片URL/题号）与 apkg 字段规范（7 字段顺序固定 + `\x1f` 分隔 + `<br>` 选项格式）
+- **格式规范弹窗**：上传弹窗含详细 xlsx 表头规范（题干/选项A~F/答案/题型/解析/知识点/图片URL/题号）、apkg 字段规范（7 字段顺序固定 + `\x1f` 分隔 + `<br>` 选项格式）、md 题库规范（`### 第 X 题` 拆题 + `**考点**/**题目**/**答案**/**解析**` 字段 + `## 填空题/解答题/选择题` 二级标题切换题型）
 - **标准题库生成 Skill**：项目内置 `.trae/skills/standard-quiz-builder/SKILL.md`，可在 TRAE IDE 中调用生成符合规范的 xlsx/apkg 题库
 
 ### 自定义出题
@@ -193,11 +196,12 @@ node src/app.js
 | `/setup` | 登录页 |
 | `/api/wrong-questions/pdf` | 导出错题本 PDF |
 | `/api/exercises/export-pdf` | 按练习记录批量导出错题/未写题目 PDF |
-| `/api/quiz/upload-folder` | 上传题库文件夹（xlsx/apkg，保留原始文件夹名） |
+| `/api/quiz/upload-folder` | 上传题库文件夹（xlsx/apkg/md，保留原始文件夹名） |
 | `/api/quiz/uninstall` | 卸载上传的题库（删除磁盘文件 + 移除配置） |
 | `/api/quiz/export-pdf` | 本地题库结果导出 PDF（错题+疑题） |
 | `/api/quiz/export-set-pdf` | 本地题库题套导出 PDF（按 setId 导出整套题，支持范围与隐藏答案） |
-| `/api/export-daily-wrong-pdf` | 按日期导出当日错题 PDF（含词语统计页） |
+| `/api/export-daily-wrong-pdf` | 按日期导出当日错题 PDF（含词语统计页，支持 `exerciseIds` 按练习过滤，`attachment` 下载方式） |
+| `/api/quiz/redo` | 当日错题重做：构建 `custom_redo_<date>_<ts>` 内存题集，返回 `{setId, questionCount}` |
 | `/api/word-frequency/refresh` | 手动刷新词语统计缓存 |
 | `/api/wrong-questions-by-ids` | 按 ID 批量获取题目详情 |
 | `/api/debug/exercises` | 调试接口（探查分类与练习数据） |
@@ -226,6 +230,13 @@ node src/app.js
 - 题库图片字段（imageUrl / analysisImageUrl）支持绝对 URL（http/https 直接渲染）与相对路径（配合 `/quiz-img/:source/*` 路由）；多图用 `|` 分隔
 - apkg 题库图片：parseApkgFile 自动解压 `media` 映射的图片到题库目录 `images/` 子目录，题干/解析 HTML 内的相对 `src` 重写为 `/quiz-img/{source}/images/xxx`；`/quiz-img/:source/*` 路由依次查 `local-quiz-bank/` 与 `uploaded-quizzes/`
 - apkg 题干含 HTML 标签（资料分析题常见 `<div>/<b>/<br>/<img>`），quiz-play.ejs / quiz-result.ejs 题干直接 innerHTML 渲染不做转义；结果页题干预览用 `.replace(/<[^>]+>/g, '')` 去标签
+- 当日错题导出/重做支持 `exerciseIds` 过滤参数：未提供时统计当日全部练习，提供时按 ID 过滤；前端复选框 `data-date` / `data-id`，`event.stopPropagation()` 避免触发行跳转
+- 当日错题重做题集通过 `quizLoader.registerCustomSet(customId, source, setName, questions)` 注册到 `customSetsMap` 内存缓存（不持久化）， setId 前缀 `custom_redo_<date>_<timestamp>`
+- 本地题库记录合并进 `exercise_history`：API 刷新粉笔数据后从 `quiz_records.json` 读取本地记录 concat + 按 `updatedTime` 降序排序，避免刷新丢失
+- 时间戳规范化：本地题库记录提交时 `normTs()` 检测 .NET ticks（>1e15，18 位数字）自动转 Unix ms（13 位）；旧数据合并时同样规范化 `updatedTime` 并重生成 `finishedTime`/`finishedDate`
+- `_isLocalQuiz` 标记的记录在 `getCategories` 中归入「本地题库」组（与「每日演练」同级独立分组，不进入知识点分类树）
+- 无选项题（填空/解答题）通过 `q.options.length === 0` 识别：做题页不渲染选项区与标记疑题按钮，改为「显示答案」按钮 + 答案/解析面板（默认隐藏，点击展开 KaTeX 补渲染）；提交判分跳过判分（`correct = null` 不计入对错与未答）；结果页显示「已查看」紫色徽章，答案行只显示「参考答案：xxx」
+- Markdown 题库解析：`parseMdFile` 用 `### 第 X 题` 拆题，`**考点**/**题目**/**答案**/**解析**` 提取字段，`## 填空题/解答题/选择题` 二级标题切换题型，自动剥离「（本题满分 X 分）」前缀；上传路由 `/api/quiz/upload-folder` 支持 `.md` 文件（按数量多数原则检测主扩展名）
 
 ## 部署
 
@@ -239,6 +250,10 @@ docker run -d -p 3000:3000 -v $(pwd)/cache:/app/cache fenbi-helper
 
 ## 历史更新
 
+- **2026-07-06** 新增无选项题（填空/解答题）答题界面支持：quizLoader.js 新增 `parseMdFile()` 解析 Markdown 题库（`### 第 X 题` 拆题 + `**考点**/**题目**/**答案**/**解析**` 字段提取，`## 填空题/解答题/选择题` 二级标题切换题型，自动剥离「（本题满分 X 分）」前缀），`loadDir` 新增 md 分支；app.js `/api/quiz/upload-folder` 路由支持 `.md` 文件（按数量多数原则检测主扩展名），`/quiz/:setId/submit` 提交判分中无选项题（`options.length === 0`）跳过判分，`correct = null` 不计入对错与未答统计；quiz-play.ejs `renderQuestion()` 检测 `isNoOpt`，无选项题渲染「▸ 显示答案」按钮 + 答案/解析面板（默认隐藏），新增 `toggleAnswer(qNo)` 函数控制展开/收起 + KaTeX 公式补渲染，`updateStatus()` / `renderDots()` / `openSubmitDialog()` 仅统计有选项题，导航点用 `.no-opt` 淡紫色独立样式；quiz-result.ejs 无选项题状态显示「已查看」紫色徽章（`.status-viewed` + `.q-item.viewed`），答案行改为「参考答案：xxx」不显示「我的答案」；quiz-list.ejs 前端文件选择器支持 `.md` 文件，状态文本显示 `xlsx X / apkg Y / md Z`
+- **2026-07-06** 列表视图新增「重做当日错题」功能：新增后端路由 `POST /api/quiz/redo`，调用 `getDailyWrongStats` 获取错题（支持 `exerciseIds` 按练习过滤），转换为 quiz-play 格式后通过 `quizLoader.registerCustomSet` 注册为 `custom_redo_<date>_<ts>` 内存题集，前端跳转 `/quiz/<setId>` 进入做题页；history.ejs 每日分组新增「重做当日错题」蓝色按钮，与「导出当日错题」并列；复选框选择时按钮切换为「重做所选错题 N」高亮态。同时新增「按练习勾选导出当日错题」：每个练习行新增复选框，勾选后「导出当日错题」按钮变高亮显示「导出所选错题 N」；`getDailyWrongStats` 新增第三参数 `exerciseIds` 按练习 ID 过滤；`/api/export-daily-wrong-pdf` 改为 `Content-Disposition: attachment` 下载方式（沿用 `/api/quiz/export-pdf` 路径），文件名 `日期-当日错题.pdf` 或 `日期-错题(所选N个练习).pdf`
+- **2026-07-06** 修复练习记录刷新时本地题库记录丢失 Bug：`getExerciseHistory` 从粉笔 API 拉取新数据后直接覆盖 `exercise_history` 缓存，导致本地题库记录丢失；修复方案为 API 拉取后从 `quiz_records.json` 读取本地记录合并并按 `updatedTime` 降序排序；同时修复本地题库记录时间戳格式 Bug（`endTime`/`startTime` 误存为 .NET ticks 18 位数字导致 `finishedTime` 为 "Invalid date"），app.js 提交路由新增 `normTs()` 函数将 ticks 转为 Unix ms，合并时同样规范化旧数据；分组逻辑与 `getCategories` 新增 `_isLocalQuiz` 标记归入「本地题库」组
+- **2026-07-06** 列表视图移除「练习次数」卡片（history.ejs / history-category-complex.ejs）
 - **2026-07-06** 资料分析题库适配（apkg）：parseApkgFile 新增 media 文件解压逻辑（apkg 内 `media` JSON 映射的数字命名图片文件解压到题库目录 `images/` 子目录）；新增 `rewriteImgSrc()` 将题干/解析 HTML 中的相对路径 `src` 重写为 `/quiz-img/{source}/images/xxx` 绝对路径；quiz-play.ejs 题干从 `escapeHtml` 改为直接 innerHTML 渲染（资料分析题干含 `<div>/<b>/<br>/<img>` 标签），CSS 移除 `white-space: pre-wrap`，新增 `.q-stem img` / `.q-stem p` 样式；quiz-result.ejs 题干完整展示改为 `<%- %>` 不转义，题干预览用 `.replace(/<[^>]+>/g, '')` 去 HTML 标签；`/quiz-img/:source/*` 路由从单目录改为双目录依次查找（`local-quiz-bank/` → `uploaded-quizzes/`）以支持上传的 apkg 题库图片
 - **2026-07-06** 项目更名为「错题助手」；本地题库题套列表新增「导出 PDF」按钮（沿用错题本导出逻辑，支持选题号范围与隐藏答案，带解析导出文件名追加「（解析）」）；新增后端路由 `/api/quiz/export-set-pdf` 按 setId 导出整套题；修正原 `/api/quiz/export-pdf` 单选题答案字母转换（correctAnswer.choice 直接传字母而非 indexOf 数字）；新增本地题库上传/卸载功能（支持 xlsx/apkg 文件夹上传，保留原始文件夹名，配置持久化到 uploaded-quizzes/config.json）；新增自定义出题（题套勾选 + Fisher-Yates 随机抽样 + 二级界面全选按键）；新增多选题支持（识别正则统一为 /多(选|项)/，前端多选交互不自动跳转，后端判分排序）；列表视图标题改为一级题库名+题目数量（旧缓存通过 recordId 三级回填 source）；解析展示压缩空白避免大量空行；新增 standard-quiz-builder skill 用于生成符合规范的 xlsx/apkg 题库；新增题库图片支持（imageUrl / analysisImageUrl 字段 + `/quiz-img/:source/*` 静态路由 + 防路径穿越）；新增 LaTeX 公式渲染（KaTeX 0.16.9 资源本地化于 `src/views/js/katex/`，支持题干/选项/解析中的 `$...$`、`$$...$$`、`\(\)`、`\[]` 公式）；修复 4 个 EJS 模板缺 `<!DOCTYPE html>` 导致浏览器 quirks mode 使 KaTeX 拒绝渲染的问题；404 中间件对 `/api/` 路径返回 JSON 而非重定向到 HTML
 - **2026-07-05** 新增本地题库刷题模块：内置片段阅读 436 题 + 逻辑推理 600 题共 1036 题；做题页支持单题作答、总计时器、标记疑题、题号导航；结果页含对错高亮、疑题标记、解析展开；做题记录自动同步至练习记录列表和分类聚合页（"本地题库"标签）；错题自动同步至错题本；结果页支持一键导出错题+疑题 PDF

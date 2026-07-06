@@ -69,6 +69,62 @@
       opacity: 0.5;
       cursor: not-allowed;
     }
+    .export-day-btn.has-selection {
+      background: var(--g-700);
+      color: #fff;
+      border-color: var(--g-700);
+    }
+    .export-day-btn.has-selection:hover {
+      background: var(--g-800);
+      color: #fff;
+    }
+    .redo-day-btn {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 14px;
+      border-radius: 8px;
+      border: 0.5px solid var(--brand-300, #99c2ff);
+      background: var(--brand-50, #e6f0ff);
+      color: var(--brand-600, #0066cc);
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: all 0.2s var(--ease-out);
+      font-family: inherit;
+    }
+    .redo-day-btn:hover {
+      background: var(--brand-100, #b8d4ff);
+      border-color: var(--brand-400, #66a3ff);
+    }
+    .redo-day-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .redo-day-btn.has-selection {
+      background: var(--brand-600, #0066cc);
+      color: #fff;
+      border-color: var(--brand-600, #0066cc);
+    }
+    .redo-day-btn.has-selection:hover {
+      background: var(--brand-700, #0052a3);
+      color: #fff;
+    }
+    .sel-count {
+      font-size: 11px;
+      color: var(--g-700);
+      font-weight: 600;
+      margin-left: 6px;
+      padding: 1px 7px;
+      background: var(--g-100);
+      border-radius: 8px;
+    }
+    .ex-cb {
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      accent-color: var(--g-700);
+    }
 
     /* 列表行 */
     .ex-row {
@@ -191,13 +247,6 @@
     <div class="hero-sub">按日期浏览全部练习</div>
   </div>
 
-  <div class="stats-row" style="margin-bottom:24px;">
-    <div class="stat-card">
-      <div class="num"><%= total %></div>
-      <div class="lbl">次练习</div>
-    </div>
-  </div>
-
   <% for (let dateKey of dateKeys) {
     let items = grouped[dateKey];
     let today = moment().format('YYYY-MM-DD');
@@ -212,7 +261,8 @@
         <span class="date-text"><%= displayDate %></span>
         <span class="date-count"><%= items.length %> 次练习</span>
         <span class="deco-line"></span>
-        <button class="export-day-btn" onclick="exportDailyWrong(this, '<%= dateKey %>')" title="导出当天错题与错误词语为 PDF">导出当日错题</button>
+        <button class="export-day-btn" onclick="exportDailyWrong(this, '<%= dateKey %>')" title="不勾选时导出当日全部错题；勾选后仅导出所选练习的错题">导出当日错题</button>
+        <button class="redo-day-btn" onclick="redoDailyWrong(this, '<%= dateKey %>')" title="不勾选时重做当日全部错题；勾选后仅重做所选练习的错题">重做当日错题</button>
       </div>
 
       <% for (let h of items) {
@@ -224,6 +274,7 @@
           : cleanTitle(h.sheet.name);
       %>
         <div class="ex-row" onclick="showReport('<%= h.id %>', <%= isLocalQuiz %>)">
+          <input type="checkbox" class="ex-cb" data-date="<%= dateKey %>" data-id="<%= h.id %>" onclick="event.stopPropagation()" onchange="onExerciseSelect(this, '<%= dateKey %>')">
           <span class="rate <%= rateClass %>"><%= h.correctRate %>%</span>
           <div class="main">
             <div class="title">
@@ -266,17 +317,87 @@
     }
   }
 
-  // 按日期导出当日错题 PDF
+  // 复选框选择：更新对应日期的导出/重做按钮状态（显示选中数量）
+  function onExerciseSelect(cb, date) {
+    var checked = document.querySelectorAll('.ex-cb[data-date="' + date + '"]:checked');
+    var cnt = checked.length;
+    var exportBtn = document.querySelector('.export-day-btn[onclick*="\'' + date + '\'"]');
+    var redoBtn = document.querySelector('.redo-day-btn[onclick*="\'' + date + '\'"]');
+    if (exportBtn) {
+      if (cnt > 0) {
+        exportBtn.classList.add('has-selection');
+        exportBtn.innerHTML = '导出所选错题<span class="sel-count">' + cnt + '</span>';
+      } else {
+        exportBtn.classList.remove('has-selection');
+        exportBtn.innerText = '导出当日错题';
+      }
+    }
+    if (redoBtn) {
+      if (cnt > 0) {
+        redoBtn.classList.add('has-selection');
+        redoBtn.innerHTML = '重做所选错题<span class="sel-count">' + cnt + '</span>';
+      } else {
+        redoBtn.classList.remove('has-selection');
+        redoBtn.innerText = '重做当日错题';
+      }
+    }
+  }
+
+  // 按日期重做当日错题（支持不选时重做全部，勾选后仅重做所选练习的错题）
+  function redoDailyWrong(btn, date) {
+    if (!date) return;
+    var checked = document.querySelectorAll('.ex-cb[data-date="' + date + '"]:checked');
+    var exerciseIds = Array.prototype.map.call(checked, function(c) {
+      return c.getAttribute('data-id');
+    });
+    var msg = exerciseIds.length > 0
+      ? '将重做 ' + date + ' 选中的 ' + exerciseIds.length + ' 个练习的错题，确认开始？'
+      : '将重做 ' + date + ' 当天的全部错题，确认开始？';
+    if (!confirm(msg)) return;
+    var originHTML = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerText = '加载中...';
+    fetch('/api/quiz/redo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date: date, exerciseIds: exerciseIds })
+    })
+    .then(function(r) {
+      if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || '构建失败'); });
+      return r.json();
+    })
+    .then(function(data) {
+      if (data.setId) {
+        window.location.href = '/quiz/' + data.setId + '?from=/history';
+      } else {
+        throw new Error('未返回题集 ID');
+      }
+    })
+    .catch(function(e) {
+      alert('重做失败：' + e.message);
+      btn.disabled = false;
+      btn.innerHTML = originHTML;
+    });
+  }
+
+  // 按日期导出当日错题 PDF（支持不选时导出全部，勾选后仅导出所选练习的错题）
   function exportDailyWrong(btn, date) {
     if (!date) return;
-    if (!confirm('将导出 ' + date + ' 当天的错题与错误词语统计，确认开始？')) return;
-    var originText = btn.innerText;
+    var checked = document.querySelectorAll('.ex-cb[data-date="' + date + '"]:checked');
+    var exerciseIds = Array.prototype.map.call(checked, function(c) {
+      return c.getAttribute('data-id');
+    });
+    var msg = exerciseIds.length > 0
+      ? '将导出 ' + date + ' 选中的 ' + exerciseIds.length + ' 个练习的错题，确认开始？'
+      : '将导出 ' + date + ' 当天的全部错题与错误词语统计，确认开始？';
+    if (!confirm(msg)) return;
+    var originHTML = btn.innerHTML;
     btn.disabled = true;
     btn.innerText = '生成中...';
     fetch('/api/export-daily-wrong-pdf', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date: date })
+      body: JSON.stringify({ date: date, exerciseIds: exerciseIds })
     })
     .then(function(r) {
       if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || '导出失败'); });
@@ -284,15 +405,20 @@
     })
     .then(function(blob) {
       var url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-      setTimeout(function() { URL.revokeObjectURL(url); }, 60000);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = date + (exerciseIds.length > 0 ? '-错题(所选' + exerciseIds.length + '个练习)' : '-当日错题') + '.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
     })
     .catch(function(e) {
       alert('导出失败：' + e.message);
     })
     .finally(function() {
       btn.disabled = false;
-      btn.innerText = originText;
+      btn.innerHTML = originHTML;
     });
   }
 </script>

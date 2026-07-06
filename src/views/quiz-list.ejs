@@ -501,7 +501,7 @@
   <div class="modal-card">
     <div class="modal-title">上传本地题库</div>
     <div class="modal-sub">
-      选择包含 <code>.xlsx</code> 或 <code>.apkg</code> 文件的文件夹，系统会按文件自动拆分题套，文件夹名作为分类名保留显示。
+      选择包含 <code>.xlsx</code>、<code>.apkg</code> 或 <code>.md</code> 文件的文件夹，系统会按文件自动拆分题套，文件夹名作为分类名保留显示。
       <a class="modal-sub-link" onclick="toggleFormatDetail()">查看详细格式规范 ▾</a>
       <div class="modal-sub-detail" id="formatDetail" style="display:none;">
         <div class="fmt-block">
@@ -555,8 +555,8 @@
             </thead>
             <tbody>
               <tr><td class="col-field">文件夹名</td><td class="col-desc">作为分类名原样保留，不再自动加时间戳或重命名</td></tr>
-              <tr><td class="col-field">文件格式</td><td class="col-desc">同一文件夹内 <code>.xlsx</code> 与 <code>.apkg</code> 不要混放，按主要格式上传</td></tr>
-              <tr><td class="col-field">文件命名</td><td class="col-desc">建议含数字段，如「第01套.xlsx」「专项02.apkg」，系统按末尾数字排序</td></tr>
+              <tr><td class="col-field">文件格式</td><td class="col-desc">同一文件夹内 <code>.xlsx</code>、<code>.apkg</code>、<code>.md</code> 不要混放，按主要格式上传</td></tr>
+              <tr><td class="col-field">文件命名</td><td class="col-desc">建议含数字段，如「第01套.xlsx」「专项02.apkg」「数学一2026.md」，系统按末尾数字排序</td></tr>
               <tr><td class="col-field">分类名（可选）</td><td class="col-desc">表单填写后将覆盖文件夹名作为分类显示名；留空则用文件夹名</td></tr>
             </tbody>
           </table>
@@ -885,11 +885,11 @@ function showResult(type, msg) {
 // 监听文件夹选择
 document.getElementById('folderInput').addEventListener('change', function(e) {
   var allFiles = e.target.files;
-  // 仅保留 xlsx / apkg
+  // 仅保留 xlsx / apkg / md
   var valid = [];
   for (var i = 0; i < allFiles.length; i++) {
     var n = allFiles[i].name.toLowerCase();
-    if (n.endsWith('.xlsx') || n.endsWith('.apkg')) {
+    if (n.endsWith('.xlsx') || n.endsWith('.apkg') || n.endsWith('.md')) {
       valid.push(allFiles[i]);
     }
   }
@@ -899,13 +899,14 @@ document.getElementById('folderInput').addEventListener('change', function(e) {
   var btn = document.getElementById('uploadSubmit');
   if (valid.length === 0) {
     pick.classList.remove('has-files');
-    text.textContent = '未发现 xlsx/apkg 文件，请重新选择';
+    text.textContent = '未发现 xlsx/apkg/md 文件，请重新选择';
     btn.disabled = true;
   } else {
     pick.classList.add('has-files');
     var xlsxN = valid.filter(function(f){ return f.name.toLowerCase().endsWith('.xlsx'); }).length;
-    var apkgN = valid.length - xlsxN;
-    text.textContent = '已选 ' + valid.length + ' 个文件（xlsx ' + xlsxN + ' / apkg ' + apkgN + '）';
+    var apkgN = valid.filter(function(f){ return f.name.toLowerCase().endsWith('.apkg'); }).length;
+    var mdN = valid.length - xlsxN - apkgN;
+    text.textContent = '已选 ' + valid.length + ' 个文件（xlsx ' + xlsxN + ' / apkg ' + apkgN + ' / md ' + mdN + '）';
     btn.disabled = false;
   }
   hideResult();

@@ -102,6 +102,7 @@
     .q-item.correct { border-left: 3px solid #2d6a1e; }
     .q-item.wrong { border-left: 3px solid #c0392b; }
     .q-item.unanswered { border-left: 3px solid #b8860b; }
+    .q-item.viewed { border-left: 3px solid #7a5aff; }
 
     .q-item-head {
       display: flex; align-items: center; gap: 10px;
@@ -123,6 +124,7 @@
     .status-correct { background: #f0f7e8; color: #2d6a1e; }
     .status-wrong { background: #fef0ee; color: #c0392b; }
     .status-unanswered { background: #fef9ee; color: #b8860b; }
+    .status-viewed { background: #f0ecff; color: #7a5aff; }
     .flag-mark {
       font-size: 12px; color: #b8860b;
       flex-shrink: 0;
@@ -275,9 +277,17 @@
     <div class="q-list">
       <% for (let i = 0; i < record.questions.length; i++) {
         let q = record.questions[i];
-        let statusClass = q.correct === true ? 'correct' : (q.correct === false ? 'wrong' : 'unanswered');
-        let statusLabel = q.correct === true ? '答对' : (q.correct === false ? '答错' : '未答');
-        let statusTagClass = q.correct === true ? 'status-correct' : (q.correct === false ? 'status-wrong' : 'status-unanswered');
+        const isNoOpt = !q.options || q.options.length === 0; // 无选项题（填空/解答）
+        let statusClass, statusLabel, statusTagClass;
+        if (isNoOpt) {
+          statusClass = 'viewed'; statusLabel = '已查看'; statusTagClass = 'status-viewed';
+        } else if (q.correct === true) {
+          statusClass = 'correct'; statusLabel = '答对'; statusTagClass = 'status-correct';
+        } else if (q.correct === false) {
+          statusClass = 'wrong'; statusLabel = '答错'; statusTagClass = 'status-wrong';
+        } else {
+          statusClass = 'unanswered'; statusLabel = '未答'; statusTagClass = 'status-unanswered';
+        }
       %>
         <div class="q-item <%= statusClass %>" data-status="<%= statusClass %>" id="qitem-<%= i %>">
           <div class="q-item-head" onclick="toggleQ(<%= i %>)">
@@ -314,10 +324,16 @@
               <% } %>
             </div>
 
-            <div class="answer-line">
-              我的答案：<b><%= q.myAnswer || '未作答' %></b>
-              　 正确答案：<b><%= q.answer %></b>
-            </div>
+            <% if (isNoOpt) { %>
+              <div class="answer-line">
+                参考答案：<b><%- q.answer %></b>
+              </div>
+            <% } else { %>
+              <div class="answer-line">
+                我的答案：<b><%= q.myAnswer || '未作答' %></b>
+                　 正确答案：<b><%= q.answer %></b>
+              </div>
+            <% } %>
 
             <div class="analysis-block">
               <div class="analysis-title">解析</div>

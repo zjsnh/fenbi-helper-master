@@ -193,6 +193,9 @@ function loadDir(cfg) {
       } else if (ext === 'apkg') {
         questions = parseApkgFile(full, cfg.source);
         sheetName = 'anki';
+      } else if (ext === 'md') {
+        questions = parseMdFile(full, cfg.source);
+        sheetName = 'markdown';
       }
 
       if (questions.length === 0) return;
@@ -346,6 +349,80 @@ function parseApkgFile(filePath, source) {
   return questions;
 }
 
+// ── Markdown 解析（考研数学等无选项题型）──
+// md 文件结构：
+//   ## 填空题 / ## 解答题
+//   ### 第 X 题
+//   **考点**：...
+//   **题目**：...
+//   **答案**：...
+//   **解析**：...
+// 返回题目对象：{ type, stem, options: [], answer, analysis, knowledge, imageUrl: '', analysisImageUrl: '' }
+function parseMdFile(filePath, source) {
+  const content = fs.readFileSync(filePath, 'utf8');
+  const questions = [];
+
+  // 按题号拆分（### 第 X 题）
+  const titleRegex = /^#{3}\s*第\s*(\d+)\s*题(?:[（(]([^)）]*)[）)])?\s*$/gm;
+  const matches = [];
+  let m;
+  while ((m = titleRegex.exec(content)) !== null) {
+    matches.push({ qNo: parseInt(m[1], 10), title: m[0], start: m.index, full: m[2] || '' });
+  }
+  if (matches.length === 0) return questions;
+
+  // 当前章节题型（填空题/解答题）
+  let currentType = '填空';
+  const sectionRegex = /^#{2}\s*(填空题|解答题|选择题)\s*$/gm;
+
+  for (let i = 0; i < matches.length; i++) {
+    const block = content.substring(matches[i].start, i + 1 < matches.length ? matches[i + 1].start : content.length);
+
+    // 在该题块之前的最近一个 ## 章节 标题决定题型
+    const sectionMatch = block.match(/^#{2}\s*(填空题|解答题|选择题)\s*$/m);
+    if (sectionMatch) {
+      currentType = sectionMatch[1].replace('题', '');
+    }
+
+    // 提取字段：**考点**、**题目**、**答案**、**解析**
+    function extractField(field) {
+      const re = new RegExp('\\*\\*' + field + '\\*\\*[：:]\\s*([\\s\\S]*?)(?=\\n\\*\\*|$)');
+      const fm = block.match(re);
+      if (!fm) return '';
+      // 去掉字段内容中尾部的分隔线 ---
+      let text = fm[1].replace(/\r/g, '').replace(/\n---\s*$/, '').trim();
+      return text;
+    }
+
+    const knowledge = extractField('考点');
+    let stem = extractField('题目');
+    const answer = extractField('答案');
+    let analysis = extractField('解析');
+
+    // 题目可能含「（本题满分 X 分）」前缀，去掉
+    stem = stem.replace(/^（本题满分\s*\d+\s*分）\s*/, '').replace(/^\(本题满分\s*\d+\s*分\)\s*/, '');
+
+    if (!stem) continue;
+
+    questions.push({
+      uid: '',
+      setId: '',
+      source,
+      qNo: matches[i].qNo,
+      type: currentType,
+      stem,
+      options: [],                    // 无选项
+      answer,                         // 答案文本（含 LaTeX）
+      analysis,                       // 解析文本（含 LaTeX）
+      knowledge,
+      imageUrl: '',
+      analysisImageUrl: ''
+    });
+  }
+
+  return questions;
+}
+
 async function loadAll() {
   if (setsMap.size > 0) return; // 已加载
   console.log('[quizLoader] 开始加载题库...');
@@ -491,6 +568,25 @@ async function buildCustomSet(setIds, count) {
   return customSet;
 }
 
+// 注册一个预构建的自定义题集（用于错题重做等场景）
+// questions 需已符合 quiz-play 格式：{ qNo, type, stem, options, answer, analysis, ... }
+function registerCustomSet(customId, source, setName, questions) {
+  // 重新编号
+  questions.forEach((q, i) => {
+    q.setId = customId;
+    q.qNo = i + 1;
+    q.uid = customId + '_q' + (i + 1);
+  });
+  const customSet = {
+    setId: customId,
+    source,
+    setName,
+    questions
+  };
+  customSetsMap.set(customId, customSet);
+  return customSet;
+}
+
 // 获取单题
 async function getQuestion(uid) {
   await loadAll();
@@ -508,4 +604,4 @@ function getSourceBySetIdSync(setId) {
   return s ? s.source : '';
 }
 
-module.exports = { loadAll, listSets, getSet, getQuestion, reload, addUploadedConfig, loadDynamicConfigs, removeUploadedConfig, isUploadedSource, buildCustomSet, getSourceBySetIdSync };
+module.exports = { loadAll, listSets, getSet, getQuestion, reload, addUploadedConfig, loadDynamicConfigs, removeUploadedConfig, isUploadedSource, buildCustomSet, registerCustomSet, getSourceBySetIdSync };
