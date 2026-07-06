@@ -625,7 +625,7 @@ router.post('/api/quiz/uninstall', async ctx => {
     }
 });
 
-// 本地题库结果导出 PDF
+// 本地题库结果导出 PDF（按做题记录导出错题+疑题）
 router.post('/api/quiz/export-pdf', async ctx => {
     try {
         const { recordId, hideAnswer } = ctx.request.body;
@@ -650,7 +650,7 @@ router.post('/api/quiz/export-pdf', async ctx => {
         const pdfQuestions = wrongAndFlagged.map(q => ({
             content: q.stem,
             options: q.options,
-            correctAnswer: { choice: String(q.options.indexOf(q.answer)), type: 201 },
+            correctAnswer: { choice: q.answer, type: 201 },
             source: record.setName + ' 第' + q.qNo + '题',
             tags: [],
             keypoints: [record.source, q.knowledge].filter(Boolean),
@@ -674,6 +674,50 @@ router.post('/api/quiz/export-pdf', async ctx => {
         ctx.body = pdfBuffer;
     } catch (e) {
         console.error('本地题库PDF导出失败:', e.message, e.stack);
+        ctx.body = { error: '导出失败: ' + e.message };
+        ctx.status = 500;
+    }
+});
+
+// 本地题库题套导出 PDF（按 setId 导出整套题，沿用错题本导出逻辑）
+router.post('/api/quiz/export-set-pdf', async ctx => {
+    try {
+        const { setId, start, end, hideAnswer } = ctx.request.body;
+        const set = await quizLoader.getSet(setId);
+        if (!set) {
+            ctx.body = { error: '题套不存在' };
+            ctx.status = 404;
+            return;
+        }
+
+        const pdfGenerator = require('./util/pdfGenerator');
+        // 转换为 pdfGenerator 期望的格式
+        const pdfQuestions = set.questions.map(q => ({
+            content: q.stem,
+            options: q.options,
+            correctAnswer: { choice: q.answer, type: 201 },
+            source: set.setName + ' 第' + q.qNo + '题',
+            tags: [],
+            keypoints: [set.source, q.knowledge].filter(Boolean),
+            solution: q.analysis
+        }));
+
+        const categoryName = set.setName;
+        const pdfBuffer = await pdfGenerator.generateWrongQuestionsPDF({
+            categoryName: categoryName,
+            questions: pdfQuestions,
+            start: parseInt(start) || 1,
+            end: parseInt(end) || pdfQuestions.length,
+            hideAnswer: hideAnswer === true
+        });
+
+        const fileSuffix = hideAnswer === true ? '' : '（解析）';
+        const fileName = encodeURIComponent(set.setName + fileSuffix + '.pdf');
+        ctx.set('Content-Type', 'application/pdf');
+        ctx.set('Content-Disposition', `inline; filename*=UTF-8''${fileName}`);
+        ctx.body = pdfBuffer;
+    } catch (e) {
+        console.error('题套PDF导出失败:', e.message, e.stack);
         ctx.body = { error: '导出失败: ' + e.message };
         ctx.status = 500;
     }

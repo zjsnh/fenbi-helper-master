@@ -342,6 +342,103 @@
       border-radius: 980px; font-size: 12px; color: var(--text-sec); cursor: pointer; font-family: inherit;
     }
     .custom-bar .bar-clear:hover { background: var(--paper, #f7f8fa); }
+
+    /* ── 题套导出 PDF 按钮 ── */
+    .set-export {
+      flex-shrink: 0;
+      font-size: 11px; font-weight: 600;
+      color: var(--g-600, #0066cc);
+      background: var(--brand-50, #e6f0ff);
+      border: 0.5px solid var(--brand-100, #b8d4ff);
+      border-radius: 8px;
+      padding: 3px 10px;
+      cursor: pointer; font-family: inherit;
+      transition: all 0.2s;
+      white-space: nowrap;
+      display: inline-flex; align-items: center; gap: 3px;
+    }
+    .set-export:hover {
+      background: var(--brand-100, #d0e4ff);
+      border-color: var(--g-400, #3399ff);
+      color: var(--g-700, #0052a3);
+    }
+
+    /* ── 导出模态框 ── */
+    .export-overlay {
+      position: fixed; inset: 0;
+      background: rgba(10,22,40,0.45);
+      backdrop-filter: blur(4px);
+      z-index: 1100;
+      display: none; align-items: center; justify-content: center;
+    }
+    .export-overlay.show { display: flex; animation: fadeIn 0.2s ease; }
+    .export-box {
+      background: var(--card, #fff); border-radius: 16px;
+      padding: 28px 32px 24px;
+      width: 420px; max-width: 92vw;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+      animation: modalIn 0.3s var(--ease-spring, ease);
+    }
+    .export-box h3 {
+      font-size: 18px; font-weight: 700; color: #0a1628;
+      margin: 0 0 4px; font-family: var(--font-display);
+    }
+    .export-sub {
+      font-size: 13px; color: var(--text-ter); margin-bottom: 20px; line-height: 1.6;
+    }
+    .export-section { margin-bottom: 18px; }
+    .export-label {
+      font-size: 12px; font-weight: 700; color: var(--text-sec, #475569);
+      text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px;
+    }
+    .export-range-row { display: flex; align-items: center; gap: 10px; }
+    .export-range-row input[type="number"] {
+      flex: 1; padding: 10px 12px; font-size: 15px; font-weight: 600;
+      border: 1.5px solid var(--border-light, #e2e8f0); border-radius: 10px;
+      background: var(--paper, #f7f8fa); color: #0a1628;
+      text-align: center; outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+      box-sizing: border-box;
+    }
+    .export-range-row input[type="number"]:focus {
+      border-color: var(--g-400, #3399ff);
+      box-shadow: 0 0 0 3px rgba(0,102,204,0.12);
+    }
+    .export-range-row .sep { font-size: 14px; color: var(--text-ter); font-weight: 600; }
+    .export-range-hint { font-size: 11px; color: var(--text-ter); margin-top: 6px; }
+    .export-hide-row {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; color: var(--text-sec);
+      cursor: pointer; user-select: none;
+    }
+    .export-hide-row input[type="checkbox"] {
+      width: 16px; height: 16px; cursor: pointer; accent-color: var(--g-600, #0066cc);
+    }
+    .export-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+    .export-btn {
+      padding: 10px 22px; font-size: 14px; font-weight: 700;
+      border: none; border-radius: 10px; cursor: pointer; font-family: inherit;
+      transition: all 0.25s var(--ease-out);
+    }
+    .export-btn-cancel {
+      background: transparent; border: 1px solid var(--border-light, #e2e8f0);
+      color: var(--text-sec);
+    }
+    .export-btn-cancel:hover { background: var(--paper, #f7f8fa); }
+    .export-btn-go {
+      background: linear-gradient(135deg, var(--g-500, #3399ff), var(--g-600, #0066cc));
+      color: #fff; box-shadow: 0 2px 8px rgba(0,102,204,0.25);
+    }
+    .export-btn-go:hover { box-shadow: 0 4px 14px rgba(0,102,204,0.35); }
+    .export-btn-go:disabled {
+      opacity: 0.5; cursor: not-allowed; box-shadow: none;
+    }
+    .export-btn-go .spinner-sm {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff;
+      border-radius: 50%; animation: spin 0.6s linear infinite;
+      vertical-align: middle; margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -486,6 +583,33 @@
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeUploadModal()">取消</button>
       <button class="btn-submit" id="uploadSubmit" onclick="submitUpload()" disabled>开始上传</button>
+    </div>
+  </div>
+</div>
+
+<!-- 导出 PDF 模态框 -->
+<div class="export-overlay" id="exportOverlay" onclick="if(event.target===this)closeSetExportModal()">
+  <div class="export-box">
+    <h3>导出 PDF</h3>
+    <div class="export-sub" id="exportSub"></div>
+    <div class="export-section">
+      <div class="export-label">题目范围</div>
+      <div class="export-range-row">
+        <input type="number" id="exportStart" min="1" value="1">
+        <span class="sep">~</span>
+        <input type="number" id="exportEnd" min="1" value="1">
+      </div>
+      <div class="export-range-hint" id="exportHint"></div>
+    </div>
+    <div class="export-section">
+      <label class="export-hide-row">
+        <input type="checkbox" id="exportHideAnswer">
+        隐藏答案与解析（用于打印练习）
+      </label>
+    </div>
+    <div class="export-actions">
+      <button class="export-btn export-btn-cancel" onclick="closeSetExportModal()">取消</button>
+      <button class="export-btn export-btn-go" id="exportGoBtn" onclick="submitSetExport()">导出 PDF</button>
     </div>
   </div>
 </div>
@@ -683,6 +807,7 @@ function showSets(idx) {
     html += '<div class="set-meta">';
     html += '<span class="set-qcount">' + s.questionCount + ' 题</span>';
     html += progressHtml;
+    html += '<button class="set-export" onclick="event.preventDefault(); event.stopPropagation(); openSetExportModal(\'' + s.setId + '\', \'' + escapeAttr(s.setName) + '\', ' + s.questionCount + ')" title="导出本套题为 PDF">导出 PDF</button>';
     html += '</div>';
     html += '<div class="set-arrow">→</div>';
     html += '</a>';
@@ -830,6 +955,70 @@ function submitUpload() {
     showResult('error', '✗ 网络错误，上传失败');
   };
   xhr.send(fd);
+}
+
+// ── 题套导出 PDF ──
+var exportSetId = '';
+var exportSetName = '';
+var exportQCount = 0;
+
+function openSetExportModal(setId, setName, qCount) {
+  exportSetId = setId;
+  exportSetName = setName;
+  exportQCount = qCount;
+  document.getElementById('exportSub').textContent = setName + ' · 共 ' + qCount + ' 题';
+  document.getElementById('exportStart').value = 1;
+  document.getElementById('exportStart').max = qCount;
+  document.getElementById('exportEnd').value = qCount;
+  document.getElementById('exportEnd').max = qCount;
+  document.getElementById('exportHint').textContent = '共 ' + qCount + ' 道题，支持导出 1 ~ ' + qCount;
+  document.getElementById('exportHideAnswer').checked = false;
+  var btn = document.getElementById('exportGoBtn');
+  btn.disabled = false;
+  btn.textContent = '导出 PDF';
+  document.getElementById('exportOverlay').classList.add('show');
+}
+
+function closeSetExportModal() {
+  document.getElementById('exportOverlay').classList.remove('show');
+}
+
+function submitSetExport() {
+  var start = parseInt(document.getElementById('exportStart').value) || 1;
+  var end = parseInt(document.getElementById('exportEnd').value) || exportQCount;
+  if (start < 1 || end > exportQCount || start > end) {
+    alert('请输入有效的题号范围（1 ~ ' + exportQCount + '）');
+    return;
+  }
+  var hideAnswer = document.getElementById('exportHideAnswer').checked;
+  var btn = document.getElementById('exportGoBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-sm"></span>生成中...';
+  fetch('/api/quiz/export-set-pdf', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ setId: exportSetId, start: start, end: end, hideAnswer: hideAnswer })
+  })
+  .then(function(r) {
+    if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || '导出失败'); });
+    return r.blob();
+  })
+  .then(function(blob) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = exportSetName + (hideAnswer ? '' : '（解析）') + '.pdf';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    closeSetExportModal();
+  })
+  .catch(function(e) {
+    alert('导出失败：' + e.message);
+    btn.disabled = false;
+    btn.textContent = '导出 PDF';
+  });
 }
 </script>
 </body>
