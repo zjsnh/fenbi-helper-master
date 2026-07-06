@@ -244,11 +244,44 @@ function parseApkgFile(filePath, source) {
   if (!entry) return [];
   const buf = entry.getData(); // Buffer
 
+  // 解压 apkg 内的 media 文件（图片等）到题库目录的 images/ 子目录
+  // apkg 内含: media(JSON映射 数字->实际文件名) + 数字命名的文件(0,1,2...)
+  const mediaMapEntry = zip.getEntries().find(e => e.entryName === 'media');
+  let mediaDir = '';
+  if (mediaMapEntry) {
+    try {
+      const mediaMap = JSON.parse(mediaMapEntry.getData().toString('utf8'));
+      // 题库目录 = apkg 文件所在目录
+      mediaDir = path.join(path.dirname(filePath), 'images');
+      if (!fs.existsSync(mediaDir)) fs.mkdirSync(mediaDir, { recursive: true });
+      Object.keys(mediaMap).forEach(numKey => {
+        const realName = mediaMap[numKey];
+        const fileEntry = zip.getEntries().find(e => e.entryName === numKey);
+        if (fileEntry) {
+          const destPath = path.join(mediaDir, realName);
+          // 避免重复写入（多 apkg 共享同一 images 目录时跳过已存在文件）
+          if (!fs.existsSync(destPath)) {
+            fs.writeFileSync(destPath, fileEntry.getData());
+          }
+        }
+      });
+    } catch (e) {
+      console.warn('[quizLoader] media 解压失败:', e.message);
+    }
+  }
+
+  // 图片 src 前缀转换：把题干/解析里的 src="xxx.png" 转为 /quiz-img/{source}/images/xxx.png
+  const encodedSource = encodeURIComponent(source);
+  function rewriteImgSrc(html) {
+    if (!html || !mediaDir) return html;
+    // 匹配 src="xxx.png" 或 src='xxx.png'（相对路径，非 http/https/绝对路径）
+    return html.replace(/src=(["'])([^"']+)\1/gi, (match, quote, src) => {
+      if (/^https?:\/\//i.test(src) || src.charAt(0) === '/') return match;
+      return 'src=' + quote + '/quiz-img/' + encodedSource + '/images/' + src + quote;
+    });
+  }
+
   const SQL = require('sql.js');
-  // sql.js 在 Node 下提供同步 Database（initSqlJs 是异步，但已缓存后 require 即可用）
-  // 这里用同步方式：调用 loadDbSync（sql.js 0.x 不支持），改为先 init 再用
-  // 实际：parseApkgFile 由 parseApkgFileAsync 调用，parseApkgFileAsync 已 await initSqlJs
-  // 为保证同步可用，直接用全局已 init 的 SQL.Database
   if (!global._sqlJsReady) {
     throw new Error('sql.js 未初始化，请先调用 loadAll()');
   }
@@ -288,18 +321,23 @@ function parseApkgFile(filePath, source) {
 
       if (!stem) return;
 
+      // 题干和解析中的图片 src 转换为 /quiz-img/ 绝对路径
+      const stemWithImg = rewriteImgSrc(stem);
+      const analysisWithImg = rewriteImgSrc(analysis);
+
       questions.push({
         uid: '',               // 后续补全
         setId: '',             // 后续补全
         source,
         qNo: idx + 1,
         type,
-        stem,
+        stem: stemWithImg,
         options,
         answer,
-        analysis,
+        analysis: analysisWithImg,
         knowledge: knowledge.trim(),
-        imageUrl: ''
+        imageUrl: '',          // apkg 图片嵌在题干 HTML 里，不单独存
+        analysisImageUrl: ''
       });
     });
   }

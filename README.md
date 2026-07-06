@@ -73,6 +73,8 @@
 - **同步错题本**：错题自动写入 `wrong_q_local_quiz.json`，兼容现有错题本格式
 - **PDF 导出**：结果页一键导出错题+疑题为 PDF（复用 pdfGenerator）；题套列表页每行新增「导出 PDF」按钮，支持选范围、隐藏答案，带解析导出文件名追加「（解析）」
 - **题目图片**：支持题干配图（imageUrl 字段）与解析配图（analysisImageUrl 字段）；xlsx 中填相对路径（如 `images/p01_q04_1.jpg`）配合题库目录下 `images/` 子目录 + 服务端 `/quiz-img/:source/*` 路由访问；多图用 `|` 分隔；绝对 URL（http/https）直接渲染
+- **apkg 题库图片**：parseApkgFile 自动解压 apkg 内 `media` 映射的图片文件到题库目录 `images/` 子目录，题干/解析 HTML 中的相对路径 `src` 自动重写为 `/quiz-img/{source}/images/xxx.png` 绝对路径；`/quiz-img/:source/*` 路由依次在 `local-quiz-bank/` 和 `uploaded-quizzes/` 下查找
+- **题干 HTML 渲染**：apkg 题库（如资料分析）题干含 `<div>/<b>/<br>/<img>` 等 HTML 标签，quiz-play.ejs / quiz-result.ejs 题干直接 innerHTML 渲染（不做 HTML 转义），结果页题干预览自动去标签
 - **LaTeX 公式渲染**：题干、选项、解析中的 LaTeX 公式通过 KaTeX 0.16.9 渲染（资源本地化于 `src/views/js/katex/`，无 CDN 依赖）；支持 `$...$` 行内、`$$...$$` 块级、`\(...\)`、`\[...\]` 四种分隔符
 
 ### 本地题库上传与卸载
@@ -187,7 +189,7 @@ node src/app.js
 | `/quiz/custom` | 自定义出题（勾选题套 + 数量，Fisher-Yates 抽样） |
 | `/quiz/:setId` | 本地题库做题页 |
 | `/quiz-result/:recordId` | 本地题库结果页 |
-| `/quiz-img/:source/*` | 题库图片静态服务（题库目录下 images/ 子目录，防路径穿越） |
+| `/quiz-img/:source/*` | 题库图片静态服务（依次在 `local-quiz-bank/` 与 `uploaded-quizzes/` 下查找 `:source/images/...`，防路径穿越） |
 | `/setup` | 登录页 |
 | `/api/wrong-questions/pdf` | 导出错题本 PDF |
 | `/api/exercises/export-pdf` | 按练习记录批量导出错题/未写题目 PDF |
@@ -222,6 +224,8 @@ node src/app.js
 - Koa-router 静态路径必须在参数路径之前注册（如 `/quiz/custom` 必须在 `/quiz/:setId` 之前），否则 "custom" 会被当作 setId 参数
 - EJS 模板必须以 `<!DOCTYPE html>` 开头，否则浏览器进入 quirks mode，KaTeX 检测到后拒绝渲染
 - 题库图片字段（imageUrl / analysisImageUrl）支持绝对 URL（http/https 直接渲染）与相对路径（配合 `/quiz-img/:source/*` 路由）；多图用 `|` 分隔
+- apkg 题库图片：parseApkgFile 自动解压 `media` 映射的图片到题库目录 `images/` 子目录，题干/解析 HTML 内的相对 `src` 重写为 `/quiz-img/{source}/images/xxx`；`/quiz-img/:source/*` 路由依次查 `local-quiz-bank/` 与 `uploaded-quizzes/`
+- apkg 题干含 HTML 标签（资料分析题常见 `<div>/<b>/<br>/<img>`），quiz-play.ejs / quiz-result.ejs 题干直接 innerHTML 渲染不做转义；结果页题干预览用 `.replace(/<[^>]+>/g, '')` 去标签
 
 ## 部署
 
@@ -235,6 +239,7 @@ docker run -d -p 3000:3000 -v $(pwd)/cache:/app/cache fenbi-helper
 
 ## 历史更新
 
+- **2026-07-06** 资料分析题库适配（apkg）：parseApkgFile 新增 media 文件解压逻辑（apkg 内 `media` JSON 映射的数字命名图片文件解压到题库目录 `images/` 子目录）；新增 `rewriteImgSrc()` 将题干/解析 HTML 中的相对路径 `src` 重写为 `/quiz-img/{source}/images/xxx` 绝对路径；quiz-play.ejs 题干从 `escapeHtml` 改为直接 innerHTML 渲染（资料分析题干含 `<div>/<b>/<br>/<img>` 标签），CSS 移除 `white-space: pre-wrap`，新增 `.q-stem img` / `.q-stem p` 样式；quiz-result.ejs 题干完整展示改为 `<%- %>` 不转义，题干预览用 `.replace(/<[^>]+>/g, '')` 去 HTML 标签；`/quiz-img/:source/*` 路由从单目录改为双目录依次查找（`local-quiz-bank/` → `uploaded-quizzes/`）以支持上传的 apkg 题库图片
 - **2026-07-06** 项目更名为「错题助手」；本地题库题套列表新增「导出 PDF」按钮（沿用错题本导出逻辑，支持选题号范围与隐藏答案，带解析导出文件名追加「（解析）」）；新增后端路由 `/api/quiz/export-set-pdf` 按 setId 导出整套题；修正原 `/api/quiz/export-pdf` 单选题答案字母转换（correctAnswer.choice 直接传字母而非 indexOf 数字）；新增本地题库上传/卸载功能（支持 xlsx/apkg 文件夹上传，保留原始文件夹名，配置持久化到 uploaded-quizzes/config.json）；新增自定义出题（题套勾选 + Fisher-Yates 随机抽样 + 二级界面全选按键）；新增多选题支持（识别正则统一为 /多(选|项)/，前端多选交互不自动跳转，后端判分排序）；列表视图标题改为一级题库名+题目数量（旧缓存通过 recordId 三级回填 source）；解析展示压缩空白避免大量空行；新增 standard-quiz-builder skill 用于生成符合规范的 xlsx/apkg 题库；新增题库图片支持（imageUrl / analysisImageUrl 字段 + `/quiz-img/:source/*` 静态路由 + 防路径穿越）；新增 LaTeX 公式渲染（KaTeX 0.16.9 资源本地化于 `src/views/js/katex/`，支持题干/选项/解析中的 `$...$`、`$$...$$`、`\(\)`、`\[]` 公式）；修复 4 个 EJS 模板缺 `<!DOCTYPE html>` 导致浏览器 quirks mode 使 KaTeX 拒绝渲染的问题；404 中间件对 `/api/` 路径返回 JSON 而非重定向到 HTML
 - **2026-07-05** 新增本地题库刷题模块：内置片段阅读 436 题 + 逻辑推理 600 题共 1036 题；做题页支持单题作答、总计时器、标记疑题、题号导航；结果页含对错高亮、疑题标记、解析展开；做题记录自动同步至练习记录列表和分类聚合页（"本地题库"标签）；错题自动同步至错题本；结果页支持一键导出错题+疑题 PDF
 - **2026-07-04** 新增申论公文格式模块（33 文种，三级卡片式浏览，含格式示意）；练习记录按 id 去重（修复跨分类重复）；练习记录多选导出错题/未写题目 PDF；热力图与分类模块滚动条优化；视频解析非会员容错（无视频自动隐藏按钮不报错）；导航栏统一补齐列表视图

@@ -187,8 +187,8 @@ router.get('/shenlun-format', async ctx => {
 // ══════════════════════════════════════
 //  本地题库刷题模块
 // ══════════════════════════════════════
-// 题库图片静态服务：/quiz-img/:source/* => local-quiz-bank/:source/*
-// 用于 xlsx 中 图片URL 字段填相对路径（如 images/p01_q04_1.jpg）时前端可访问
+// 题库图片静态服务：/quiz-img/:source/* => 在 local-quiz-bank/ 和 uploaded-quizzes/ 下查找 :source/images/...
+// 用于 xlsx 相对路径图片 + apkg 内 media 图片（parseApkgFile 解压到 images/ 子目录）
 router.get('/quiz-img/:source/(.*)', async ctx => {
     const source = decodeURIComponent(ctx.params.source);
     const relPath = ctx.params[0];
@@ -198,8 +198,16 @@ router.get('/quiz-img/:source/(.*)', async ctx => {
         ctx.body = 'Invalid path';
         return;
     }
-    const fullPath = path.join(__dirname, '..', 'local-quiz-bank', source, relPath);
-    if (!fs.existsSync(fullPath)) {
+    // 依次在 local-quiz-bank/ 和 uploaded-quizzes/ 下查找
+    const candidates = [
+        path.join(__dirname, '..', 'local-quiz-bank', source, relPath),
+        path.join(__dirname, '..', 'uploaded-quizzes', source, relPath)
+    ];
+    let fullPath = null;
+    for (const p of candidates) {
+        if (fs.existsSync(p)) { fullPath = p; break; }
+    }
+    if (!fullPath) {
         ctx.status = 404;
         ctx.body = 'Image not found';
         return;

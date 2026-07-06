@@ -132,9 +132,10 @@
       font-size: 15px; line-height: 1.85;
       color: var(--text-900);
       margin-bottom: 20px;
-      white-space: pre-wrap;
       word-break: break-word;
     }
+    .q-stem img { max-width: 100%; border-radius: 8px; margin: 8px 0; }
+    .q-stem p { margin: 8px 0; }
     .q-image {
       max-width: 100%;
       margin: 10px 0 20px;
@@ -405,7 +406,7 @@ function renderQuestion(dir) {
   html += '</button>';
   html += '</div>';
 
-  html += '<div class="q-stem">' + escapeHtml(q.stem) + '</div>';
+  html += '<div class="q-stem">' + q.stem + '</div>';
 
   if (q.imageUrl) {
     // 图片URL支持多图（| 分隔），相对路径自动转换

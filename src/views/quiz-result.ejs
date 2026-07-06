@@ -149,8 +149,10 @@
       font-size: 14px; line-height: 1.8;
       color: var(--text-900);
       padding: 14px 0;
-      white-space: pre-wrap;
+      word-break: break-word;
     }
+    .q-stem-full img { max-width: 100%; border-radius: 8px; margin: 8px 0; }
+    .q-stem-full p { margin: 8px 0; }
     .q-image-full {
       max-width: 100%; margin: 8px 0 14px;
       border-radius: 8px;
@@ -282,11 +284,11 @@
             <span class="q-no">第<%= i+1 %>题</span>
             <span class="q-status <%= statusTagClass %>"><%= statusLabel %></span>
             <% if (q.flagged) { %><span class="flag-mark" title="疑题">★</span><% } %>
-            <span class="q-stem-preview"><%= q.stem.replace(/[\r\n]+/g, ' ').slice(0, 80) %>...</span>
+            <span class="q-stem-preview"><%= q.stem.replace(/<[^>]+>/g, '').replace(/[\r\n]+/g, ' ').slice(0, 80) %>...</span>
             <span class="q-toggle">▼</span>
           </div>
           <div class="q-item-body">
-            <div class="q-stem-full"><%= q.stem %></div>
+            <div class="q-stem-full"><%- q.stem %></div>
             <% if (q.imageUrl) {
               const stemImgs = String(q.imageUrl).split('|').map(s => s.trim()).filter(Boolean);
               stemImgs.forEach(src => {
