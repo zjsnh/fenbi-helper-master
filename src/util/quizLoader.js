@@ -82,6 +82,96 @@ function naturalSort(a, b) {
   return na - nb;
 }
 
+/**
+ * 修复非标准 LaTeX 语法
+ * 题库生成时可能产生 [matrix]、⎩⎨⎧ 等非标准标记，KaTeX 无法识别
+ * 此函数将其转为标准 LaTeX 环境（matrix / pmatrix / cases）
+ */
+function fixNonStandardMath(text) {
+  if (!text || typeof text !== 'string') return text;
+  if (!text.includes('[matrix]') && !text.includes('⎩⎨⎧')) return text;
+
+  // 一次性处理 $$...$$ 和 $...$（$$ 优先）
+  text = text.replace(/\$\$([\s\S]*?)\$\$|\$([^\$]+)\$/g, function (m, display, inline) {
+    if (display !== undefined) return '$$' + fixMathInner(display) + '$$';
+    return '$' + fixMathInner(inline) + '$';
+  });
+
+  return text;
+}
+
+/**
+ * 修复单个 math 块内部的 [matrix] 标记
+ * 规则：
+ *   ⎩⎨⎧[matrix]  → \begin{cases}   （Unicode 分段括号）
+ *   {[matrix]     → \begin{cases}   （花括号分段）
+ *   ([matrix]     → \begin{pmatrix} （带圆括号的向量/矩阵）
+ *   [matrix]      → \begin{matrix}  （裸矩阵）
+ * 闭合规则：
+ *   matrix  → 遇到下一个 \begin{...}、) 或块尾时闭合
+ *   pmatrix → 遇到 ) 或块尾时闭合
+ *   cases   → 块尾闭合
+ */
+function fixMathInner(math) {
+  if (!math.includes('[matrix]') && !math.includes('⎩⎨⎧')) return math;
+
+  // ⎩⎨⎧[matrix] → \begin{cases}
+  math = math.replace(/⎩⎨⎧\[matrix\]/g, '\\begin{cases}');
+  // 移除残留的 ⎩⎨⎧
+  math = math.replace(/⎩⎨⎧/g, '');
+
+  // {[matrix] → \begin{cases}
+  math = math.replace(/\{\[matrix\]/g, '\\begin{cases}');
+
+  // ([matrix] → \begin{pmatrix}
+  math = math.replace(/\(\[matrix\]/g, '\\begin{pmatrix}');
+
+  // 剩余 [matrix] → \begin{matrix}
+  math = math.replace(/\[matrix\]/g, '\\begin{matrix}');
+
+  // token 扫描：补全 \end{...}
+  var tokenRegex = /(\\begin\{(cases|pmatrix|matrix)\})|(\))/g;
+  var opens = [];
+  var result = '';
+  var lastIndex = 0;
+  var match;
+
+  while ((match = tokenRegex.exec(math)) !== null) {
+    result += math.substring(lastIndex, match.index);
+    lastIndex = tokenRegex.lastIndex;
+
+    if (match[1]) {
+      // 新环境开始：如果上一个 matrix 未闭合，先闭合（matrix 不嵌套）
+      if (opens.length > 0 && opens[opens.length - 1] === 'matrix') {
+        opens.pop();
+        result += '\\end{matrix}';
+      }
+      result += match[1];
+      opens.push(match[2]);
+    } else if (match[3]) {
+      // 遇到 )：闭合 pmatrix 或 matrix
+      if (opens.length > 0) {
+        var top = opens[opens.length - 1];
+        if (top === 'pmatrix' || top === 'matrix') {
+          opens.pop();
+          result += '\\end{' + top + '}';
+        } else {
+          result += ')';
+        }
+      } else {
+        result += ')';
+      }
+    }
+  }
+
+  result += math.substring(lastIndex);
+  while (opens.length > 0) {
+    result += '\\end{' + opens.pop() + '}';
+  }
+
+  return result;
+}
+
 function readXlsx(filePath) {
   const wb = xlsx.readFile(filePath);
   const result = {};
@@ -152,10 +242,10 @@ function parseQuestion(row, header, source, setId, qNo) {
     source,         // 来源：片段阅读 / 逻辑推理
     qNo,            // 题套内序号
     type,           // 题型
-    stem,           // 题干
+    stem: fixNonStandardMath(stem),           // 题干
     options,        // 选项数组（4 或 6 个）
-    answer,         // 正确答案字母 A/B/C/D/E/F
-    analysis,       // 解析
+    answer: fixNonStandardMath(answer),       // 正确答案字母 A/B/C/D/E/F
+    analysis: fixNonStandardMath(analysis),   // 解析
     knowledge,      // 知识点
     imageUrl,       // 题干图片URL（可能为空，多图用|分隔）
     analysisImageUrl // 解析图片URL（可能为空，多图用|分隔）
@@ -334,10 +424,10 @@ function parseApkgFile(filePath, source) {
         source,
         qNo: idx + 1,
         type,
-        stem: stemWithImg,
+        stem: fixNonStandardMath(stemWithImg),
         options,
-        answer,
-        analysis: analysisWithImg,
+        answer: fixNonStandardMath(answer),
+        analysis: fixNonStandardMath(analysisWithImg),
         knowledge: knowledge.trim(),
         imageUrl: '',          // apkg 图片嵌在题干 HTML 里，不单独存
         analysisImageUrl: ''
@@ -410,10 +500,10 @@ function parseMdFile(filePath, source) {
       source,
       qNo: matches[i].qNo,
       type: currentType,
-      stem,
+      stem: fixNonStandardMath(stem),
       options: [],                    // 无选项
-      answer,                         // 答案文本（含 LaTeX）
-      analysis,                       // 解析文本（含 LaTeX）
+      answer: fixNonStandardMath(answer),   // 答案文本（含 LaTeX）
+      analysis: fixNonStandardMath(analysis), // 解析文本（含 LaTeX）
       knowledge,
       imageUrl: '',
       analysisImageUrl: ''
