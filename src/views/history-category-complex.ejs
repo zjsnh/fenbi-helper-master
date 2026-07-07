@@ -335,7 +335,8 @@
   <a href="/word-frequency">词语统计</a>
   <a href="/quiz">本地题库</a>
   <a href="/shenlun-format">公文格式</a>
-  <a href="/setup" style="margin-left:auto;">切换账号</a>
+  <% if (typeof userPhone !== 'undefined' && userPhone) { %><span class="nav-user"><span class="user-phone"><%= userPhone %></span><% if (typeof isAdmin !== 'undefined' && isAdmin) { %><span class="admin-badge">管理员<span class="admin-tooltip"><span class="tip-title">👑 管理员权限</span><span class="tip-item">卸载题库</span><span class="tip-item">恢复题库</span><span class="tip-item">查看回收站</span></span></span><% } %></span><% } else { %><span style="margin-left:auto;"></span><% } %>
+  <a href="/setup">切换账号</a>
   <span id="deviceBadge" style="font-size:10px;color:var(--ink-400);padding:3px 8px;border:0.5px solid var(--g-200);border-radius:6px;font-family:var(--font-mono, monospace);" title="当前设备指纹">设备 -</span>
 </div>
 <script>
@@ -354,7 +355,6 @@
 </script>
 
 <div class="container-wide">
-  <% if (exerciseHistory.length == 0) { %><script>window.location='/setup'</script><% } %>
 
   <!-- 页面头部 -->
   <div class="page-hero" style="display:flex;align-items:center;justify-content:space-between;">
@@ -391,6 +391,14 @@
   <div class="card" style="margin-bottom:28px; padding:20px;">
     <div id="cal-heatmap"></div>
   </div>
+
+  <% if (exerciseHistory.length == 0) { %>
+    <div style="text-align:center;padding:60px 20px;color:var(--text-ter);background:var(--card);border-radius:14px;border:0.5px solid var(--border-light);">
+      <div style="font-size:48px;margin-bottom:16px;">📋</div>
+      <div style="font-size:16px;font-weight:600;color:var(--text-sec);margin-bottom:6px;">暂无练习记录</div>
+      <div style="font-size:13px;line-height:1.8;">当前账号还没有任何练习记录<br>完成粉笔 App 上的练习后再来查看</div>
+    </div>
+  <% } else { %>
 
   <!-- 分类练习记录：手风琴式 -->
   <% for (let c1 of groupItems) { %>
@@ -472,10 +480,8 @@
     </div>
     <% } %>
   <% } %>
-
-  <% if (groupItems.every(function(c){ return c.count === 0; })) { %>
-    <div class="empty-hint">暂无练习记录</div>
   <% } %>
+
 </div>
 
 <script>

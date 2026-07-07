@@ -21,6 +21,8 @@ const exerciseResult = require('./service/exercisesResult');
 const loginService = require('./service/loginService');
 const quizLoader = require('./util/quizLoader');
 const quizRecord = require('./util/quizRecord');
+const userStore = require('./util/userStore');
+const { requireLogin, requireAdmin, isPublicPath } = require('./util/auth');
 
 render(app, {
     root: path.join(__dirname, 'views'),
@@ -82,6 +84,14 @@ app.use(async(ctx, next) => {
             ctx.body = '服务器内部错误: ' + (err.message || '');
         }
     }
+});
+
+// 全局登录态校验中间件：公开路径放行，其余路径要求 cookie 中含 userid
+app.use(async (ctx, next) => {
+    if (isPublicPath(ctx.path)) {
+        return await next();
+    }
+    await requireLogin(ctx, next);
 });
 
 app.use(router.routes()).use(router.allowedMethods())
@@ -156,31 +166,19 @@ router.get('/question/:questionId', async ctx => {
 });
 
 router.get('/wrong-questions', async ctx => {
-    let cookie = ctx.request.headers['cookie']
-    if (!cookie || !cookie.includes('userid')) {
-        ctx.redirect('/setup');
-    } else {
-        await ctx.render('wrong-questions', await exerciseResult.getWrongQuestions(cookie));
-    }
+    let cookie = ctx.request.headers['cookie'];
+    await ctx.render('wrong-questions', await exerciseResult.getWrongQuestions(ctx.userId, cookie));
 });
 
 router.get('/word-frequency', async ctx => {
-    let cookie = ctx.request.headers['cookie']
-    if (!cookie || !cookie.includes('userid')) {
-        ctx.redirect('/setup');
-    } else {
-        await ctx.render('word-frequency', await exerciseResult.getWordFrequency(cookie));
-    }
+    let cookie = ctx.request.headers['cookie'];
+    await ctx.render('word-frequency', await exerciseResult.getWordFrequency(ctx.userId, cookie));
 });
 
 router.get('/api/wrong-questions/:keypointId', async ctx => {
-    let cookie = ctx.request.headers['cookie']
-    if (!cookie || !cookie.includes('userid')) {
-        ctx.body = { error: '请先登录' };
-        return;
-    }
+    let cookie = ctx.request.headers['cookie'];
     try {
-        let result = await exerciseResult.getWrongQuestionDetails(ctx.params.keypointId, cookie);
+        let result = await exerciseResult.getWrongQuestionDetails(ctx.userId, ctx.params.keypointId, cookie);
         ctx.body = result;
     } catch (e) {
         ctx.body = { error: e.message, questions: [] };
@@ -188,15 +186,14 @@ router.get('/api/wrong-questions/:keypointId', async ctx => {
 });
 
 router.post('/api/wrong-questions/refresh', async ctx => {
-    let cookie = ctx.request.headers['cookie'];
-    if (!cookie || !cookie.includes('userid')) {
-        ctx.body = { error: '请先登录' };
-        ctx.status = 401;
-        return;
-    }
     try {
         const cache = require('./util/cacheUtil');
-        let count = cache.clearByPrefix('wrong_');
+        // 清除当前用户的错题相关缓存
+        let count = ctx.userId ? cache.clearForUser(ctx.userId, 'wrong_') : 0;
+        // 同时清除 keypoint tree 缓存
+        if (ctx.userId) {
+            try { cache.clearForUser(ctx.userId, 'wrong_keypoint_tree'); } catch (e) {}
+        }
         ctx.body = { code: 200, message: '同步成功，已清除 ' + count + ' 条缓存', cleared: count };
     } catch (e) {
         ctx.body = { code: 500, message: '同步失败：' + e.message };
@@ -254,7 +251,7 @@ router.get('/quiz-img/:source/(.*)', async ctx => {
 
 router.get('/quiz', async ctx => {
     const groups = await quizLoader.listSets();
-    const progressMap = quizRecord.getAllSetProgress();
+    const progressMap = quizRecord.getAllSetProgress(ctx.userId);
 
     // 组装数据
     let totalQuestions = 0;
@@ -281,7 +278,8 @@ router.get('/quiz', async ctx => {
     });
 
     await ctx.render('quiz-list', {
-        sources, totalSets, totalQuestions, totalAnswered
+        sources, totalSets, totalQuestions, totalAnswered,
+        isAdmin: userStore.isAdmin(ctx.userId)
     });
 });
 
@@ -359,6 +357,7 @@ router.post('/quiz/:setId/submit', async ctx => {
             return {
                 uid: q.uid,
                 qNo: q.qNo,
+                origNo: q.origNo,
                 type: q.type,
                 stem: q.stem,
                 options: q.options,
@@ -391,6 +390,7 @@ router.post('/quiz/:setId/submit', async ctx => {
         return {
             uid: q.uid,
             qNo: q.qNo,
+            origNo: q.origNo,
             type: q.type,
             stem: q.stem,
             options: q.options,
@@ -450,13 +450,13 @@ router.post('/quiz/:setId/submit', async ctx => {
     };
 
     // 保存到 quiz_records
-    quizRecord.saveRecord(record);
+    quizRecord.saveRecord(ctx.userId, record);
 
     // 同步错题到 wrong_q 缓存（keypointId = 'local_quiz'）
-    syncWrongQuestionsToCache(questions, record);
+    syncWrongQuestionsToCache(ctx.userId, questions, record);
 
     // 同步到 exercise_history 缓存（合并本地题库记录到练习记录）
-    syncToExerciseHistory(record);
+    syncToExerciseHistory(ctx.userId, record);
 
     console.log('Quiz 提交: ' + set.setName + ' 正确率=' + accuracy + '% 用时=' + durationDesc);
     ctx.body = { recordId, accuracy, correctCount, wrongCount, unansweredCount };
@@ -465,11 +465,6 @@ router.post('/quiz/:setId/submit', async ctx => {
 // 当日错题重做：从指定日期（可选指定练习）的错题构建重做题集，跳转到 quiz-play 页面
 router.post('/api/quiz/redo', async ctx => {
     let cookie = ctx.request.headers['cookie'];
-    if (!cookie || !cookie.includes('userid')) {
-        ctx.body = { error: '请先登录' };
-        ctx.status = 401;
-        return;
-    }
     try {
         const { date, exerciseIds } = ctx.request.body;
         if (!date) {
@@ -478,7 +473,7 @@ router.post('/api/quiz/redo', async ctx => {
             return;
         }
         console.log('当日错题重做: date=' + date + (Array.isArray(exerciseIds) && exerciseIds.length > 0 ? ', exerciseIds=' + exerciseIds.join(',') : ''));
-        const stats = await exerciseResult.getDailyWrongStats(date, cookie, exerciseIds);
+        const stats = await exerciseResult.getDailyWrongStats(ctx.userId, date, cookie, exerciseIds);
         if (!stats.questions || stats.questions.length === 0) {
             ctx.body = { error: '所选范围无错题数据' };
             ctx.status = 404;
@@ -542,11 +537,11 @@ function formatDuration(ms) {
     return m + '分' + (s < 10 ? '0' : '') + s + '秒';
 }
 
-// 同步错题到 wrong_q 缓存
-function syncWrongQuestionsToCache(questions, record) {
+// 同步错题到 wrong_q 缓存（按 userId 隔离）
+function syncWrongQuestionsToCache(userId, questions, record) {
     const cache = require('./util/cacheUtil');
     const cacheKey = 'wrong_q_local_quiz';
-    let cached = cache.readCache(cacheKey, 365 * 24 * 60 * 60 * 1000);
+    let cached = userId ? cache.readForUser(userId, cacheKey, 365 * 24 * 60 * 60 * 1000) : null;
     let existing = (cached && cached.questions) || [];
 
     // 移除该 recordId 下的旧错题（重新提交时替换）
@@ -576,15 +571,15 @@ function syncWrongQuestionsToCache(questions, record) {
         }
     });
 
-    cache.writeCache(cacheKey, { questions: existing }, 365 * 24 * 60 * 60 * 1000);
+    if (userId) cache.writeForUser(userId, cacheKey, { questions: existing }, 365 * 24 * 60 * 60 * 1000);
     console.log('错题本同步: 共 ' + existing.length + ' 道本地题库错题');
 }
 
-// 同步到 exercise_history 缓存
-function syncToExerciseHistory(record) {
+// 同步到 exercise_history 缓存（按 userId 隔离）
+function syncToExerciseHistory(userId, record) {
     const cache = require('./util/cacheUtil');
     const cacheKey = 'exercise_history';
-    let cached = cache.readCache(cacheKey, 30 * 24 * 60 * 60 * 1000);
+    let cached = userId ? cache.readForUser(userId, cacheKey, 30 * 24 * 60 * 60 * 1000) : null;
     if (!cached || !cached.data) {
         // 没有缓存，初始化一个空结构
         cached = {
@@ -654,7 +649,7 @@ function syncToExerciseHistory(record) {
         data.exerciseHeatMapData[v] = (data.exerciseHeatMapData[v] || 0) + (h.answerCount || 0);
     });
 
-    cache.writeCache(cacheKey, { data }, 30 * 24 * 60 * 60 * 1000);
+    if (userId) cache.writeForUser(userId, cacheKey, { data }, 30 * 24 * 60 * 60 * 1000);
     console.log('练习记录同步: 已加入本地题库记录 ' + record.setName);
 }
 
@@ -679,7 +674,7 @@ function groupExerciseHistory(exerciseHistory) {
 }
 
 router.get('/quiz-result/:recordId', async ctx => {
-    const record = quizRecord.getRecord(ctx.params.recordId);
+    const record = quizRecord.getRecord(ctx.userId, ctx.params.recordId);
     await ctx.render('quiz-result', {
         record,
         backUrl: resolveBackUrl(ctx.query.from)
@@ -764,7 +759,7 @@ router.post('/api/quiz/upload-folder', async ctx => {
 });
 
 // 卸载上传的题库（软删除：移入回收站，2 天内可恢复）
-router.post('/api/quiz/uninstall', async ctx => {
+router.post('/api/quiz/uninstall', requireAdmin, async ctx => {
     try {
         const { source } = ctx.request.body;
         if (!source) {
@@ -795,7 +790,7 @@ router.post('/api/quiz/uninstall', async ctx => {
 });
 
 // 列出回收站内可恢复的题库
-router.get('/api/quiz/trash', async ctx => {
+router.get('/api/quiz/trash', requireAdmin, async ctx => {
     try {
         const trash = quizLoader.listTrash();
         ctx.body = { code: 0, trash };
@@ -805,7 +800,7 @@ router.get('/api/quiz/trash', async ctx => {
 });
 
 // 从回收站恢复题库
-router.post('/api/quiz/restore', async ctx => {
+router.post('/api/quiz/restore', requireAdmin, async ctx => {
     try {
         const { folderName } = ctx.request.body;
         if (!folderName) {
@@ -830,7 +825,7 @@ router.post('/api/quiz/restore', async ctx => {
 router.post('/api/quiz/export-pdf', async ctx => {
     try {
         const { recordId, hideAnswer } = ctx.request.body;
-        const record = quizRecord.getRecord(recordId);
+        const record = quizRecord.getRecord(ctx.userId, recordId);
         if (!record) {
             ctx.body = { error: '记录不存在' };
             ctx.status = 404;
@@ -925,78 +920,66 @@ router.post('/api/quiz/export-set-pdf', async ctx => {
 });
 
 router.get('/history', async ctx => {
-    let cookie = ctx.request.headers['cookie']
-    if (!cookie || !cookie.includes('userid')) {
-        ctx.redirect('/setup');
-    } else {
-        let data = await exerciseResult.getExerciseHistory(cookie, false);
-        // 本地题库记录回填一级题库名（source）
-        // 旧缓存记录可能没有 source/setId 字段，需多路径回填
-        await quizLoader.loadAll();
-        // 从 quiz_records 构建反查映射：recordId -> { setId, source }
-        const localRecords = quizRecord.readAll();
-        const recMap = {};
-        localRecords.forEach(r => { recMap[r.recordId || r.id] = r; });
-        data.exerciseHistory.forEach(h => {
-            if (!h._isLocalQuiz) return;
-            // 路径1：记录自带 source
-            if (h.source) return;
-            // 路径2：通过 setId 反查 setsMap
-            if (h.setId) {
-                const src = quizLoader.getSourceBySetIdSync(h.setId);
-                if (src) { h.source = src; return; }
+    let cookie = ctx.request.headers['cookie'];
+    let data = await exerciseResult.getExerciseHistory(ctx.userId, cookie, false);
+    // 本地题库记录回填一级题库名（source）
+    // 旧缓存记录可能没有 source/setId 字段，需多路径回填
+    await quizLoader.loadAll();
+    // 从 quiz_records 构建反查映射：recordId -> { setId, source }
+    const localRecords = quizRecord.readAll(ctx.userId);
+    const recMap = {};
+    localRecords.forEach(r => { recMap[r.recordId || r.id] = r; });
+    data.exerciseHistory.forEach(h => {
+        if (!h._isLocalQuiz) return;
+        // 路径1：记录自带 source
+        if (h.source) return;
+        // 路径2：通过 setId 反查 setsMap
+        if (h.setId) {
+            const src = quizLoader.getSourceBySetIdSync(h.setId);
+            if (src) { h.source = src; return; }
+        }
+        // 路径3：通过 recordId 反查 quiz_records
+        const rec = recMap[h.id];
+        if (rec) {
+            if (rec.source) { h.source = rec.source; h.setId = h.setId || rec.setId; return; }
+            if (rec.setId) {
+                const src2 = quizLoader.getSourceBySetIdSync(rec.setId);
+                if (src2) { h.source = src2; h.setId = rec.setId; return; }
             }
-            // 路径3：通过 recordId 反查 quiz_records
-            const rec = recMap[h.id];
-            if (rec) {
-                if (rec.source) { h.source = rec.source; h.setId = h.setId || rec.setId; return; }
-                if (rec.setId) {
-                    const src2 = quizLoader.getSourceBySetIdSync(rec.setId);
-                    if (src2) { h.source = src2; h.setId = rec.setId; return; }
-                }
-            }
-            // 兜底
-            h.source = (h.sheet && h.sheet.name) ? h.sheet.name : '本地题库';
-        });
-        // 按日期分组
-        let grouped = {};
-        let total = 0;
-        data.exerciseHistory.forEach(h => {
-            let dateKey = moment(h.updatedTime).format('YYYY-MM-DD');
-            if (!grouped[dateKey]) grouped[dateKey] = [];
-            grouped[dateKey].push(h);
-            total++;
-        });
-        // 日期倒序
-        let dateKeys = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
-        await ctx.render('history', {
-            grouped: grouped,
-            dateKeys: dateKeys,
-            total: total,
-            moment: moment,
-            cleanTitle: function(name) { return name.replace(/<[^>]+>/g, ''); }
-        });
-    }
+        }
+        // 兜底
+        h.source = (h.sheet && h.sheet.name) ? h.sheet.name : '本地题库';
+    });
+    // 按日期分组
+    let grouped = {};
+    let total = 0;
+    data.exerciseHistory.forEach(h => {
+        let dateKey = moment(h.updatedTime).format('YYYY-MM-DD');
+        if (!grouped[dateKey]) grouped[dateKey] = [];
+        grouped[dateKey].push(h);
+        total++;
+    });
+    // 日期倒序
+    let dateKeys = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+    await ctx.render('history', {
+        grouped: grouped,
+        dateKeys: dateKeys,
+        total: total,
+        moment: moment,
+        cleanTitle: function(name) { return name.replace(/<[^>]+>/g, ''); }
+    });
 });
 
 router.get('/history-category', async ctx => {
     let cookie = ctx.request.headers['cookie'];
-    if (!cookie || !cookie.includes('userid')) {
-        ctx.redirect('/setup');
-    } else {
-        await ctx.render('history-category', await exerciseResult.getExerciseHistory(cookie, false));
-    }
+    await ctx.render('history-category', await exerciseResult.getExerciseHistory(ctx.userId, cookie, false));
 });
 
 router.get('/history-category-complex', async ctx => {
-    let cookie = ctx.request.headers['cookie']
-    if (!cookie || !cookie.includes('userid')) {
-        ctx.redirect('/setup');
-    } else {
-        let forceRefresh = ctx.query.refresh === '1';
-        let data = await exerciseResult.getExerciseHistory(cookie, forceRefresh);
-        await ctx.render('history-category-complex', data);
-    }
+    let cookie = ctx.request.headers['cookie'];
+    let forceRefresh = ctx.query.refresh === '1';
+    let data = await exerciseResult.getExerciseHistory(ctx.userId, cookie, forceRefresh);
+    await ctx.render('history-category-complex', data);
 });
 
 router.get('/setup', async ctx => {
@@ -1019,8 +1002,20 @@ router.post('/api/login', async ctx => {
                     httpOnly: false
                 });
             });
+            // 从 Set-Cookie 中提取 userId，创建/更新用户记录并触发旧数据迁移
+            const cookieStr = cookies.map(c => c.name + '=' + c.value).join('; ');
+            const userId = userStore.getUserIdByCookie(cookieStr);
+            if (userId) {
+                userStore.upsertUser(userId, phone);
+                try {
+                    const r = userStore.migrateLegacyDataIfNeeded(userId);
+                    if (!r.skipped) console.log('[LOGIN] 数据迁移结果:', r);
+                } catch (e) {
+                    console.error('[LOGIN] 数据迁移失败:', e.message);
+                }
+            }
             let referer = ctx.request.headers.referer;
-            let redirectPath = qs.parse(url.parse(referer).query)['redirectPath'] || '/history';
+            let redirectPath = qs.parse(url.parse(referer).query)['redirectPath'] || '/history-category-complex';
             ctx.body = {
                 code: 200,
                 redirectPath
@@ -1076,24 +1071,14 @@ router.post('/api/zj', koaBody(), async ctx => {
 });
 
 router.get('/word-frequency', async ctx => {
-    let cookie = ctx.request.headers['cookie'];
-    if (!cookie || !cookie.includes('userid')) {
-        ctx.redirect('/setup');
-    } else {
-        await ctx.render('word-frequency', {});
-    }
+    await ctx.render('word-frequency', {});
 });
 
 router.get('/api/word-frequency', async ctx => {
     let cookie = ctx.request.headers['cookie'];
-    if (!cookie || !cookie.includes('userid')) {
-        ctx.body = { error: '请先登录' };
-        ctx.status = 401;
-        return;
-    }
     try {
         let forceRefresh = ctx.query.refresh === '1';
-        ctx.body = await exerciseResult.getWordFrequency(cookie, forceRefresh);
+        ctx.body = await exerciseResult.getWordFrequency(ctx.userId, cookie, forceRefresh);
     } catch (e) {
         ctx.body = { error: e.message, words: [], total: 0 };
     }
@@ -1101,13 +1086,8 @@ router.get('/api/word-frequency', async ctx => {
 
 router.post('/api/word-frequency/refresh', async ctx => {
     let cookie = ctx.request.headers['cookie'];
-    if (!cookie || !cookie.includes('userid')) {
-        ctx.body = { error: '请先登录' };
-        ctx.status = 401;
-        return;
-    }
     try {
-        let data = await exerciseResult.getWordFrequency(cookie, true);
+        let data = await exerciseResult.getWordFrequency(ctx.userId, cookie, true);
         ctx.body = {
             code: 200,
             message: '更新成功，共 ' + (data.words.length + data.idioms.length) + ' 条词语',
@@ -1121,11 +1101,6 @@ router.post('/api/word-frequency/refresh', async ctx => {
 
 router.post('/api/wrong-questions-by-ids', async ctx => {
     let cookie = ctx.request.headers['cookie'];
-    if (!cookie || !cookie.includes('userid')) {
-        ctx.body = { error: '请先登录' };
-        ctx.status = 401;
-        return;
-    }
     try {
         let { ids } = ctx.request.body;
         if (!ids || !Array.isArray(ids) || ids.length === 0) {
@@ -1168,11 +1143,6 @@ router.post('/api/wrong-questions-by-ids', async ctx => {
 // PDF 导出路由
 router.post('/api/wrong-questions/pdf', async ctx => {
     let cookie = ctx.request.headers['cookie'];
-    if (!cookie || !cookie.includes('userid')) {
-        ctx.body = { error: '请先登录' };
-        ctx.status = 401;
-        return;
-    }
 
     try {
         const { keypointId, start, end } = ctx.request.body;
@@ -1180,7 +1150,7 @@ router.post('/api/wrong-questions/pdf', async ctx => {
         const pdfGenerator = require('./util/pdfGenerator');
 
         // 获取题目详情
-        const result = await exerciseResult.getWrongQuestionDetails(keypointId, cookie);
+        const result = await exerciseResult.getWrongQuestionDetails(ctx.userId, keypointId, cookie);
 
         if (!result.questions || result.questions.length === 0) {
             ctx.body = { error: '没有可导出的题目' };
@@ -1195,7 +1165,7 @@ router.post('/api/wrong-questions/pdf', async ctx => {
             start: parseInt(start) || 1,
             end: parseInt(end) || result.questions.length
         });
-        
+
         ctx.set('Content-Type', 'application/pdf');
         ctx.set('Content-Disposition', `attachment; filename="wrong-questions-${keypointId}.pdf"`);
         ctx.body = pdfBuffer;
@@ -1209,11 +1179,6 @@ router.post('/api/wrong-questions/pdf', async ctx => {
 // 按日期导出当日错题 PDF（含逻辑填空词语统计页）
 router.post('/api/export-daily-wrong-pdf', async ctx => {
     let cookie = ctx.request.headers['cookie'];
-    if (!cookie || !cookie.includes('userid')) {
-        ctx.body = { error: '请先登录' };
-        ctx.status = 401;
-        return;
-    }
 
     try {
         const { date, exerciseIds } = ctx.request.body;
@@ -1225,7 +1190,7 @@ router.post('/api/export-daily-wrong-pdf', async ctx => {
         console.log('当日错题统计: date=' + date + (Array.isArray(exerciseIds) && exerciseIds.length > 0 ? ', exerciseIds=' + exerciseIds.join(',') : ''));
         const pdfGenerator = require('./util/pdfGenerator');
 
-        const stats = await exerciseResult.getDailyWrongStats(date, cookie, exerciseIds);
+        const stats = await exerciseResult.getDailyWrongStats(ctx.userId, date, cookie, exerciseIds);
 
         if (!stats.questions || stats.questions.length === 0) {
             ctx.body = { error: '所选范围无错题数据' };
@@ -1249,11 +1214,6 @@ router.post('/api/export-daily-wrong-pdf', async ctx => {
 // 按练习记录批量导出错题/未写题目 PDF
 router.post('/api/exercises/export-pdf', async ctx => {
     let cookie = ctx.request.headers['cookie'];
-    if (!cookie || !cookie.includes('userid')) {
-        ctx.body = { error: '请先登录' };
-        ctx.status = 401;
-        return;
-    }
     try {
         const { exerciseIds, type, moduleName } = ctx.request.body;
         if (!exerciseIds || !Array.isArray(exerciseIds) || exerciseIds.length === 0) {
@@ -1303,10 +1263,6 @@ router.get('/favicon.ico', async ctx => {
 // 调试接口：查看API原始返回
 router.get('/api/debug/exercises', async ctx => {
     let cookie = ctx.request.headers['cookie'];
-    if (!cookie || !cookie.includes('userid')) {
-        ctx.body = { error: '请先登录' };
-        return;
-    }
     try {
         const { httpRequest } = require('./util/httpUtil');
         let results = {};
@@ -1412,8 +1368,7 @@ router.get('/api/debug/exercises', async ctx => {
 });
 
 router.all('/', async ctx => {
-    let cookie = ctx.request.headers['cookie']
-    if (!cookie || !cookie.includes('userid')) {
+    if (!ctx.userId) {
         ctx.redirect('/setup');
     } else {
         ctx.redirect('/history-category-complex');

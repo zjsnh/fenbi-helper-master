@@ -260,6 +260,103 @@ body::before { display: none; }
   font-weight: 600;
 }
 
+/* ── navbar 用户标识 ── */
+.navbar .nav-user {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-500, #94a3b8);
+}
+.navbar .nav-user .user-phone {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.2px;
+}
+/* 管理员徽章：金色渐变 + 图标 + 显著尺寸 */
+.navbar .nav-user .admin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 980px;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #b45309 100%);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  box-shadow: 0 1px 4px rgba(217, 119, 6, 0.4), inset 0 0.5px 0 rgba(255,255,255,0.3);
+  cursor: help;
+  position: relative;
+  border: 0.5px solid rgba(255,255,255,0.2);
+}
+.navbar .nav-user .admin-badge::before {
+  content: '👑';
+  font-size: 11px;
+  filter: drop-shadow(0 0.5px 0 rgba(0,0,0,0.3));
+}
+/* 悬浮 tooltip：列出管理员功能 */
+.navbar .nav-user .admin-badge .admin-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  background: #0a1628;
+  color: #fff;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.7;
+  letter-spacing: 0;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25), 0 2px 8px rgba(0,0,0,0.15);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+  pointer-events: none;
+  z-index: 1000;
+  white-space: normal;
+}
+.navbar .nav-user .admin-badge .admin-tooltip::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  right: 16px;
+  width: 8px;
+  height: 8px;
+  background: #0a1628;
+  transform: rotate(45deg);
+}
+.navbar .nav-user .admin-badge .admin-tooltip .tip-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fbbf24;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 0.5px solid rgba(255,255,255,0.15);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.navbar .nav-user .admin-badge .admin-tooltip .tip-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: #cbd5e1;
+}
+.navbar .nav-user .admin-badge .admin-tooltip .tip-item::before {
+  content: '✓';
+  color: #10b981;
+  font-weight: 700;
+  margin-top: 1px;
+}
+.navbar .nav-user .admin-badge:hover .admin-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
 /* 导航栏下拉菜单 */
 .nav-dropdown {
   position: relative;

@@ -78,4 +78,33 @@ function clearByPrefix(prefix) {
     return count;
 }
 
-module.exports = { readCache, writeCache, isCacheValid, getCacheTime, clearByPrefix };
+// ══════════════════════════════════════
+//  按用户隔离的缓存读写
+//  实际 key 为 `<key>_<userId>`，文件名形如 <key>_<userId>.json
+// ══════════════════════════════════════
+function readForUser(userId, key, customExpireMs) {
+    if (!userId) return null;
+    return readCache(key + '_' + userId, customExpireMs);
+}
+
+function writeForUser(userId, key, value, expireMs) {
+    if (!userId) return null;
+    return writeCache(key + '_' + userId, value, expireMs);
+}
+
+// 清除某用户某前缀的缓存：前缀形如 'wrong_q_'，将匹配 'wrong_q_<userId>_*.json'
+function clearForUser(userId, prefix) {
+    if (!userId) return 0;
+    const fullPrefix = prefix + userId + '_';
+    let files = fs.readdirSync(CACHE_DIR);
+    let count = 0;
+    files.forEach(f => {
+        if (f.startsWith(fullPrefix) && f.endsWith('.json')) {
+            fs.unlinkSync(path.join(CACHE_DIR, f));
+            count++;
+        }
+    });
+    return count;
+}
+
+module.exports = { readCache, writeCache, isCacheValid, getCacheTime, clearByPrefix, readForUser, writeForUser, clearForUser };

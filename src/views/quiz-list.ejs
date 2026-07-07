@@ -539,7 +539,8 @@
   <a href="/word-frequency">词语统计</a>
   <a href="/quiz" class="active">本地题库</a>
   <a href="/shenlun-format">公文格式</a>
-  <a href="/setup" style="margin-left:auto;">切换账号</a>
+  <% if (typeof userPhone !== 'undefined' && userPhone) { %><span class="nav-user"><span class="user-phone"><%= userPhone %></span><% if (typeof isAdmin !== 'undefined' && isAdmin) { %><span class="admin-badge">管理员<span class="admin-tooltip"><span class="tip-title">👑 管理员权限</span><span class="tip-item">卸载题库</span><span class="tip-item">恢复题库</span><span class="tip-item">查看回收站</span></span></span><% } %></span><% } else { %><span style="margin-left:auto;"></span><% } %>
+  <a href="/setup">切换账号</a>
 </div>
 
 <div class="page-wrap" style="max-width:1100px; margin:0 auto; padding:32px 24px 60px;">
@@ -559,7 +560,8 @@
 
     <div class="cat-grid" id="catGrid"></div>
 
-    <!-- 回收站：软删除题库暂存区，2 天内可恢复 -->
+    <% if (isAdmin) { %>
+    <!-- 回收站：软删除题库暂存区，2 天内可恢复（仅管理员可见） -->
     <div class="trash-section empty" id="trashSection">
       <div class="trash-header" onclick="toggleTrash()">
         <span class="trash-icon">&#128230;</span>
@@ -570,6 +572,7 @@
       <div class="trash-hint" id="trashHint" style="display:none;">卸载的题库会在此保留 2 天，超期将永久删除且不可恢复。</div>
       <div class="trash-list" id="trashList"></div>
     </div>
+    <% } %>
   </div>
 
   <!-- 第二级：题套列表页 -->
@@ -738,16 +741,18 @@
 <script>
 // 数据：所有分类与题套（服务端渲染注入）
 var SOURCES = <%- JSON.stringify(sources) %>;
+var IS_ADMIN = <%- isAdmin ? 'true' : 'false' %>;
 
 // ── 渲染分类页 ──
 function renderCategory() {
   var html = '';
   SOURCES.forEach(function(src, idx) {
-    var isLr = src.sets.length > 0 && src.sets[0].setId.indexOf('lr_') === 0;
+    // 基于 source 名称判断题库类型：含"逻辑"或"推理"为逻辑题库
+    var isLr = src.name.indexOf('逻辑') >= 0 || src.name.indexOf('推理') >= 0;
     var cls = 'cat-card' + (isLr ? ' lr' : '');
     html += '<div class="' + cls + '" onclick="showSets(' + idx + ')">';
-    // 上传的题库显示卸载按钮
-    if (src.uploaded) {
+    // 上传的题库显示卸载按钮（仅管理员）
+    if (src.uploaded && IS_ADMIN) {
       html += '<button class="cat-uninstall" title="卸载此题库" onclick="event.stopPropagation(); uninstallQuiz(\'' + escapeAttr(src.name) + '\')">&#x2715;</button>';
     }
     html += '<div class="cat-name">' + src.name + '</div>';
@@ -980,7 +985,8 @@ function showSets(idx) {
   document.getElementById('listTitle').textContent = src.name;
   document.getElementById('listSub').textContent = '共 ' + src.sets.length + ' 套题 · ' + src.totalQ + ' 题，点击下方任意一套进入做题';
 
-  var isLr = src.sets.length > 0 && src.sets[0].setId.indexOf('lr_') === 0;
+  // 基于 source 名称判断题库类型：含"逻辑"或"推理"为逻辑题库
+  var isLr = src.name.indexOf('逻辑') >= 0 || src.name.indexOf('推理') >= 0;
   var html = '';
   src.sets.forEach(function(s) {
     var progressHtml = '';
@@ -1027,7 +1033,8 @@ function backToCategory() {
 
 // 初始化
 renderCategory();
-loadTrash();
+// 回收站仅管理员加载
+if (IS_ADMIN) loadTrash();
 
 // ── 上传题库相关 ──
 var selectedFiles = [];

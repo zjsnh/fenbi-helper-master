@@ -369,12 +369,12 @@ let getNotesMapByIds = async function (questionIds, cookie) {
     return _.zipObject(result.map(r => r.questionId), result.map(r => r.content));
 }
 
-exports.getExerciseHistory = async function (cookie, forceRefresh) {
+exports.getExerciseHistory = async function (userId, cookie, forceRefresh) {
     let cacheKey = 'exercise_history';
 
-    // 非强制刷新时，优先读本地缓存
+    // 非强制刷新时，优先读本地缓存（按 userId 隔离）
     if (!forceRefresh) {
-        let cached = cache.readCache(cacheKey);
+        let cached = userId ? cache.readForUser(userId, cacheKey) : null;
         if (cached && cached.data) {
             console.log('练习记录: 使用本地缓存, 共 ' + cached.data.exerciseHistory.length + ' 条');
             cached.data.moment = moment;
@@ -429,7 +429,7 @@ exports.getExerciseHistory = async function (cookie, forceRefresh) {
 
     // 合并本地题库记录（从 quiz_records 缓存读取，避免刷新时丢失）
     const quizRecord = require('../util/quizRecord');
-    const localRecords = quizRecord.readAll().map(r => {
+    const localRecords = quizRecord.readAll(userId).map(r => {
         // 规范化 updatedTime：部分旧记录存了 .NET ticks（18位），需转为 Unix ms（13位）
         let updatedTime = r.updatedTime;
         if (updatedTime && updatedTime > 1e15) {
@@ -510,7 +510,7 @@ exports.getExerciseHistory = async function (cookie, forceRefresh) {
         exerciseHistoryGroup,
         exerciseHistory,
     };
-    cache.writeCache(cacheKey, { data: dataToCache }, 30 * 24 * 60 * 60 * 1000);
+    if (userId) cache.writeForUser(userId, cacheKey, { data: dataToCache }, 30 * 24 * 60 * 60 * 1000);
     console.log('练习记录: 数据已缓存, 共 ' + exerciseHistory.length + ' 条');
 
     data._fromCache = false;
@@ -832,9 +832,9 @@ exports.addCollect = async function (questionId, cookie) {
 
 // 按日期统计当日错题：错题列表 + 关联词语统计
 // exerciseIds 可选：指定练习 ID 数组，仅统计这些练习的错题（未提供则统计当天全部）
-exports.getDailyWrongStats = async function (date, cookie, exerciseIds) {
-    // 读取练习记录缓存
-    let cached = cache.readCache('exercise_history');
+exports.getDailyWrongStats = async function (userId, date, cookie, exerciseIds) {
+    // 读取练习记录缓存（按 userId 隔离）
+    let cached = userId ? cache.readForUser(userId, 'exercise_history') : null;
     if (!cached || !cached.data || !cached.data.exerciseHistory) {
         return { date, questions: [], wordStatsList: [] };
     }
@@ -859,7 +859,7 @@ exports.getDailyWrongStats = async function (date, cookie, exerciseIds) {
             // 本地题库记录：从 quiz_records 缓存读取，不调用在线 API
             if (item._isLocalQuiz) {
                 const quizRecord = require('../util/quizRecord');
-                const rec = quizRecord.getRecord(item.id);
+                const rec = quizRecord.getRecord(userId, item.id);
                 if (!rec || !rec.questions) continue;
                 rec.questions.forEach(q => {
                     if (q.correct === false) {
@@ -913,7 +913,7 @@ exports.getDailyWrongStats = async function (date, cookie, exerciseIds) {
     // 逻辑填空词语统计：从全错题本词语频次中，筛选出与当日错题关联的词语
     let wordStatsList = [];
     try {
-        let freqData = await exports.getWordFrequency(cookie);
+        let freqData = await exports.getWordFrequency(userId, cookie);
         let allWords = [].concat(freqData.words || [], freqData.idioms || []);
         let wrongIdSet = new Set(wrongQuestionIds);
         wordStatsList = allWords
@@ -1048,10 +1048,10 @@ function buildCategoryTree(nodes, parentPath) {
     });
 }
 
-// 获取keypointTree（带缓存）
-async function getKeypointTree(cookie) {
+// 获取keypointTree（带缓存，按 userId 隔离）
+async function getKeypointTree(userId, cookie) {
     let cacheKey = 'wrong_keypoint_tree';
-    let cached = cache.readCache(cacheKey);
+    let cached = userId ? cache.readForUser(userId, cacheKey) : null;
     if (cached) {
         return cached.tree;
     }
@@ -1062,15 +1062,15 @@ async function getKeypointTree(cookie) {
         headers: { ...headers, cookie }
     });
     if (tree && tree.length > 0) {
-        cache.writeCache(cacheKey, { tree });
+        if (userId) cache.writeForUser(userId, cacheKey, { tree });
     }
     return tree;
 }
 
-// 获取指定知识点下的题目详情（带缓存，按keypointId缓存）
-async function fetchAndCacheWrongQuestions(keypointId, questionIds, cookie) {
+// 获取指定知识点下的题目详情（带缓存，按keypointId缓存，按 userId 隔离）
+async function fetchAndCacheWrongQuestions(userId, keypointId, questionIds, cookie) {
     let cacheKey = 'wrong_q_' + keypointId;
-    let cached = cache.readCache(cacheKey);
+    let cached = userId ? cache.readForUser(userId, cacheKey) : null;
     if (cached && cached.questions) {
         console.log('PDF: 使用缓存 questions=' + cached.questions.length + ' for keypointId=' + keypointId);
         return cached.questions;
@@ -1107,12 +1107,12 @@ async function fetchAndCacheWrongQuestions(keypointId, questionIds, cookie) {
         });
     });
     console.log('PDF: 最终构建 ' + questions.length + ' 道题目 for keypointId=' + keypointId);
-    cache.writeCache(cacheKey, { questions });
+    if (userId) cache.writeForUser(userId, cacheKey, { questions });
     return questions;
 }
 
-exports.getWrongQuestions = async function (cookie) {
-    let keypointTree = await getKeypointTree(cookie);
+exports.getWrongQuestions = async function (userId, cookie) {
+    let keypointTree = await getKeypointTree(userId, cookie);
     if (!keypointTree || keypointTree.length === 0) {
         return { categories: [], total: 0, cachedAt: null };
     }
@@ -1123,7 +1123,7 @@ exports.getWrongQuestions = async function (cookie) {
     // 统计总错题数
     let total = categories.reduce((sum, c) => sum + c.count, 0);
 
-    let cachedAt = cache.getCacheTime('wrong_keypoint_tree');
+    let cachedAt = userId ? cache.getCacheTime('wrong_keypoint_tree_' + userId) : null;
 
     // 生成侧边栏HTML
     let sidebarHtml = buildSidebarHtml(categories);
@@ -1148,9 +1148,9 @@ function buildSidebarHtml(nodes, depth) {
 }
 
 // 获取指定知识点的错题详情（按需加载）
-exports.getWrongQuestionDetails = async function (keypointId, cookie) {
+exports.getWrongQuestionDetails = async function (userId, keypointId, cookie) {
     // 先从keypointTree中找到该节点的questionIds
-    let keypointTree = await getKeypointTree(cookie);
+    let keypointTree = await getKeypointTree(userId, cookie);
     let targetNode = null;
 
     function findNode(nodes, id) {
@@ -1179,7 +1179,7 @@ exports.getWrongQuestionDetails = async function (keypointId, cookie) {
     // 去重
     let uniqueIds = [...new Set(allIds)];
 
-    let questions = await fetchAndCacheWrongQuestions(keypointId, uniqueIds, cookie);
+    let questions = await fetchAndCacheWrongQuestions(userId, keypointId, uniqueIds, cookie);
     return { questions, count: uniqueIds.length, name: targetNode.name };
 }
 
@@ -1233,11 +1233,11 @@ exports.search = async function (text, cookie, moduleFilter) {
 
 // 从错题本逻辑填空题中收集选项词语频次统计
 // cacheExpireMs: 15 天；forceRefresh=true 时强制重新拉取
-exports.getWordFrequency = async function (cookie, forceRefresh) {
+exports.getWordFrequency = async function (userId, cookie, forceRefresh) {
     let cacheKey = 'word_frequency';
     const WORD_FREQ_EXPIRE_MS = 15 * 24 * 60 * 60 * 1000; // 15天
     if (!forceRefresh) {
-        let cached = cache.readCache(cacheKey, WORD_FREQ_EXPIRE_MS);
+        let cached = userId ? cache.readForUser(userId, cacheKey, WORD_FREQ_EXPIRE_MS) : null;
         if (cached && (cached.words || cached.idioms)) {
             return cached;
         }
@@ -1245,7 +1245,7 @@ exports.getWordFrequency = async function (cookie, forceRefresh) {
     console.log('[WORD-FREQ] 缓存未命中或强制刷新，从API获取数据...');
 
     // 1. 获取错题本分类树
-    let keypointTree = await getKeypointTree(cookie);
+    let keypointTree = await getKeypointTree(userId, cookie);
     if (!keypointTree || keypointTree.length === 0) {
         return { words: [], total: 0, cachedAt: Date.now() };
     }
@@ -1347,7 +1347,7 @@ exports.getWordFrequency = async function (cookie, forceRefresh) {
     // console.log('[WORD-FREQ] 四字成语数:', idioms.length, '高频词语数:', words.length);
 
     let data = { words, idioms, total: words.length + idioms.length, cachedAt: Date.now() };
-    cache.writeCache(cacheKey, data, WORD_FREQ_EXPIRE_MS);
+    if (userId) cache.writeForUser(userId, cacheKey, data, WORD_FREQ_EXPIRE_MS);
     return data;
 }
 

@@ -384,7 +384,11 @@
   <a class="back-link" href="/quiz">← 题库</a>
   <div class="set-info">
     <span class="name"><%= setName %>
-      <span class="source-tag <%= setId.indexOf('lr_') === 0 ? 'tag-lr' : 'tag-fr' %>"><%= setId.indexOf('lr_') === 0 ? '逻辑' : '阅读' %></span>
+      <%
+        // 基于 source 字段判断题库类型：含"逻辑"或"推理"为逻辑题库
+        var isLr = source && (source.indexOf('逻辑') >= 0 || source.indexOf('推理') >= 0);
+      %>
+      <span class="source-tag <%= isLr ? 'tag-lr' : 'tag-fr' %>"><%= isLr ? '逻辑' : '阅读' %></span>
     </span>
   </div>
   <div class="timer" id="timer">00:00</div>
@@ -474,7 +478,9 @@ function renderQuestion(dir) {
   var isNoOpt = !q.options || q.options.length === 0; // 无选项题（填空/解答）
 
   var html = '<div class="q-header">';
-  html += '<span class="q-no">第 ' + (curIdx + 1) + ' 题</span>';
+  // 题号显示：优先用 xlsx 原始序号（如推理题第10套从181开始），无则用数组下标+1
+  var displayNo = q.origNo || (curIdx + 1);
+  html += '<span class="q-no">第 ' + displayNo + ' 题</span>';
   html += '<span class="q-type">' + (q.type || '单选') + '</span>';
   // 无选项题不显示标记疑题按钮
   if (!isNoOpt) {

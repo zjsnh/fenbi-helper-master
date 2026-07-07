@@ -210,6 +210,17 @@ function parseQuestion(row, header, source, setId, qNo) {
   // 题型（先取，用于判断多选）
   const type = get('题型') || '单选';
 
+  // 原始序号（xlsx 中的"序号"或"题号"字段，用于题号显示）
+  // 逻辑推理表头有"序号"列（如第10套从181开始），片段阅读表头有"题号"列
+  let origNo = get('序号') || get('题号') || '';
+  origNo = String(origNo).trim();
+  // 转为数字，无效则留空（回退到数组下标+1）
+  if (origNo && !isNaN(Number(origNo))) {
+    origNo = Number(origNo);
+  } else {
+    origNo = '';
+  }
+
   // 答案规范化：多选题保留全部字母并排序，单选题仅取首字母
   let answer = String(get('答案') || '').trim().toUpperCase();
   if (/多(选|项)/.test(type)) {
@@ -243,7 +254,8 @@ function parseQuestion(row, header, source, setId, qNo) {
     uid,            // 全局唯一 ID
     setId,          // 所属题套 ID
     source,         // 来源：片段阅读 / 逻辑推理
-    qNo,            // 题套内序号
+    qNo,            // 题套内序号（数组下标+1）
+    origNo,         // 原始序号（xlsx 中的"序号"或"题号"字段，可能为空）
     type,           // 题型
     stem: fixNonStandardMath(stem),           // 题干
     options,        // 选项数组（4 或 6 个）
