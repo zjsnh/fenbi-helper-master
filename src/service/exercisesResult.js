@@ -5,6 +5,7 @@ const percentile = require('percentile');
 
 const {httpRequest} = require('../util/httpUtil');
 const idiomDict = require('../util/idiomDict');
+const reviewScheduler = require('../util/reviewScheduler');
 
 let headers = {
     "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
@@ -513,8 +514,133 @@ exports.getExerciseHistory = async function (userId, cookie, forceRefresh) {
     if (userId) cache.writeForUser(userId, cacheKey, { data: dataToCache }, 30 * 24 * 60 * 60 * 1000);
     console.log('练习记录: 数据已缓存, 共 ' + exerciseHistory.length + ' 条');
 
+    // 从 report 中提取所有练习的错题 ID，批量拉取详情后写入 exercise_wrong 缓存并入复习队列
+    if (userId && cookie) {
+        try {
+            await syncExerciseWrongQuestions(userId, exerciseHistory, exerciseReportMap, cookie);
+        } catch (e) {
+            console.error('练习记录: 同步练习错题失败:', e.message);
+        }
+    }
+
     data._fromCache = false;
     return data;
+}
+
+// ══════════════════════════════════════
+//  从练习 report 中提取错题，批量拉取详情，写入 exercise_wrong 缓存并入复习队列
+//  在 getExerciseHistory 刷新数据时自动调用，用户无需手动操作
+// ══════════════════════════════════════
+async function syncExerciseWrongQuestions(userId, exerciseHistory, exerciseReportMap, cookie) {
+    // 只同步当天的错题，避免历史错题全部入队导致队列过大
+    const today = moment().format('YYYY-MM-DD');
+
+    // 1. 从 report 中提取当天练习的错题 ID（correct=false），按 exerciseId 分组
+    const exerciseWrongMap = {}; // exerciseId -> [{ questionId, exerciseName, finishedDate }]
+    const allWrongIds = new Set();
+
+    exerciseHistory.forEach(h => {
+        if (h._isLocalQuiz) return; // 本地题库错题走另一条路
+        if (h.finishedDate !== today) return; // 只同步当天的错题
+        const report = exerciseReportMap[h.id];
+        if (!report || !Array.isArray(report.answers)) return;
+
+        const wrongItems = [];
+        report.answers.forEach(answer => {
+            // status=10 表示已作答，correct=false 表示答错
+            if (answer.status === 10 && answer.correct === false) {
+                wrongItems.push({
+                    questionId: answer.questionId,
+                    exerciseName: (h.sheet && h.sheet.name) || h.cleanName || '',
+                    finishedDate: h.finishedDate || ''
+                });
+                allWrongIds.add(answer.questionId);
+            }
+        });
+
+        if (wrongItems.length > 0) {
+            exerciseWrongMap[h.id] = wrongItems;
+        }
+    });
+
+    if (allWrongIds.size === 0) {
+        console.log('练习记录: 无错题需要同步');
+        return;
+    }
+
+    console.log('练习记录: 发现 ' + allWrongIds.size + ' 道错题，分布在 ' + Object.keys(exerciseWrongMap).length + ' 个练习中');
+
+    // 2. 过滤掉已在复习队列中的题目
+    const reviewState = reviewScheduler.getReviewState(userId);
+    const newWrongIds = [];
+    allWrongIds.forEach(qid => {
+        if (!reviewState.items[String(qid)]) {
+            newWrongIds.push(qid);
+        }
+    });
+
+    if (newWrongIds.length === 0) {
+        console.log('练习记录: 错题已全部在复习队列中，无需同步');
+        return;
+    }
+
+    console.log('练习记录: 需拉取详情的新错题 ' + newWrongIds.length + ' 题');
+
+    // 3. 批量拉取错题详情（每批 20 个）
+    const solutionMap = {};
+    for (let i = 0; i < newWrongIds.length; i += 20) {
+        const batchIds = newWrongIds.slice(i, i + 20);
+        try {
+            const batchSolutions = await getSolutionsByIds(batchIds, cookie);
+            Object.assign(solutionMap, batchSolutions);
+            console.log('练习记录: 批次 ' + (Math.floor(i / 20) + 1) + ' 获取到 ' + Object.keys(batchSolutions || {}).length + ' 条详情');
+        } catch (e) {
+            console.error('练习记录: 批次 ' + (Math.floor(i / 20) + 1) + ' 失败: ' + e.message);
+        }
+    }
+
+    // 4. 按练习分组写入 exercise_wrong 缓存，并收集所有错题用于入队
+    const allWrongQuestions = [];
+    Object.keys(exerciseWrongMap).forEach(exerciseId => {
+        const wrongItems = exerciseWrongMap[exerciseId];
+        const wrongQuestions = [];
+
+        wrongItems.forEach(item => {
+            const sol = solutionMap[item.questionId];
+            if (!sol) return; // 详情拉取失败，跳过
+            const q = {
+                questionId: item.questionId,
+                content: sol.content,
+                options: sol.accessories && sol.accessories[0] ? sol.accessories[0].options : [],
+                correctAnswer: sol.correctAnswer,
+                difficulty: sol.difficulty,
+                source: sol.source,
+                tags: (sol.tags || []).map(t => t.name),
+                keypoints: (sol.keypoints || []).map(k => k.name),
+                solution: sol.solution,
+                exerciseId: exerciseId,
+                exerciseName: item.exerciseName,
+                finishedDate: item.finishedDate
+            };
+            wrongQuestions.push(q);
+            allWrongQuestions.push(q);
+        });
+
+        if (wrongQuestions.length > 0) {
+            cache.writeForUser(userId, 'exercise_wrong_' + exerciseId, {
+                wrongQuestions: wrongQuestions,
+                exerciseName: wrongQuestions[0].exerciseName,
+                finishedDate: wrongQuestions[0].finishedDate,
+                wrongCount: wrongQuestions.length
+            }, 30 * 24 * 60 * 60 * 1000);
+        }
+    });
+
+    // 5. 批量入复习队列
+    if (allWrongQuestions.length > 0) {
+        const added = reviewScheduler.enqueueQuestions(userId, allWrongQuestions);
+        console.log('练习记录: 错题入复习队列 ' + added + ' 题');
+    }
 }
 
 exports.getQuestion = async function (questionId, cookie) {
@@ -1128,7 +1254,16 @@ exports.getWrongQuestions = async function (userId, cookie) {
     // 生成侧边栏HTML
     let sidebarHtml = buildSidebarHtml(categories);
 
-    return { categories, total, cachedAt, sidebarHtml };
+    // 同步错题到艾宾浩斯复习队列（扫描所有错题缓存，新错题自动入队）
+    let reviewStats = null;
+    try {
+        reviewScheduler.syncFromWrongCache(userId);
+        reviewStats = reviewScheduler.getReviewStats(userId);
+    } catch (e) {
+        console.error('[WRONG-Q] 同步复习队列失败:', e.message);
+    }
+
+    return { categories, total, cachedAt, sidebarHtml, reviewStats };
 }
 
 function buildSidebarHtml(nodes, depth) {

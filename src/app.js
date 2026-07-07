@@ -22,6 +22,7 @@ const loginService = require('./service/loginService');
 const quizLoader = require('./util/quizLoader');
 const quizRecord = require('./util/quizRecord');
 const userStore = require('./util/userStore');
+const reviewScheduler = require('./util/reviewScheduler');
 const { requireLogin, requireAdmin, isPublicPath } = require('./util/auth');
 
 render(app, {
@@ -92,6 +93,18 @@ app.use(async (ctx, next) => {
         return await next();
     }
     await requireLogin(ctx, next);
+});
+
+// 注入全局模板变量（userPhone/isAdmin），所有 ctx.render 自动携带
+app.use(async (ctx, next) => {
+    if (ctx.userId) {
+        const user = userStore.getUser(ctx.userId);
+        if (user) {
+            ctx.state.userPhone = user.phone || user.phoneRaw || '';
+            ctx.state.isAdmin = userStore.isAdmin(ctx.userId);
+        }
+    }
+    await next();
 });
 
 app.use(router.routes()).use(router.allowedMethods())
@@ -170,9 +183,79 @@ router.get('/wrong-questions', async ctx => {
     await ctx.render('wrong-questions', await exerciseResult.getWrongQuestions(ctx.userId, cookie));
 });
 
+// 艾宾浩斯复习规划页面
+router.get('/review-plan', async ctx => {
+    // 先同步新错题到复习队列，确保规划数据最新
+    try {
+        reviewScheduler.syncFromWrongCache(ctx.userId);
+    } catch (e) {
+        console.error('[REVIEW] 同步错题失败:', e.message);
+    }
+    const stats = reviewScheduler.getReviewStats(ctx.userId);
+    // 默认起点 = 今天
+    const today = new Date();
+    const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+    await ctx.render('review-plan', {
+        userId: ctx.userId,
+        stats,
+        defaultStartDate: todayStr
+    });
+});
+
+// API: 获取复习计划模拟数据
+router.get('/api/quiz/review/plan', async ctx => {
+    try {
+        const startDate = ctx.query.startDate;
+        if (!startDate) {
+            ctx.body = { error: '缺少 startDate 参数' };
+            ctx.status = 400;
+            return;
+        }
+        const plan = reviewScheduler.simulatePlan(ctx.userId, startDate);
+        ctx.body = plan;
+    } catch (e) {
+        console.error('[REVIEW] 获取计划失败:', e.message);
+        ctx.body = { error: '获取计划失败: ' + e.message };
+        ctx.status = 500;
+    }
+});
+
+// API: 应用复习计划
+router.post('/api/quiz/review/apply-plan', async ctx => {
+    try {
+        const { startDate } = ctx.request.body || {};
+        if (!startDate) {
+            ctx.body = { error: '缺少 startDate 参数' };
+            ctx.status = 400;
+            return;
+        }
+        const result = reviewScheduler.applyPlan(ctx.userId, startDate);
+        console.log('[REVIEW] 应用复习计划: ' + result.applied + ' 题, 起点 ' + startDate);
+        ctx.body = result;
+    } catch (e) {
+        console.error('[REVIEW] 应用计划失败:', e.message);
+        ctx.body = { error: '应用计划失败: ' + e.message };
+        ctx.status = 500;
+    }
+});
+
 router.get('/word-frequency', async ctx => {
     let cookie = ctx.request.headers['cookie'];
     await ctx.render('word-frequency', await exerciseResult.getWordFrequency(ctx.userId, cookie));
+});
+
+router.get('/word-stats', async ctx => {
+    await ctx.render('word-stats', {});
+});
+
+router.get('/idioms', async ctx => {
+    await ctx.render('idioms', {});
+});
+
+router.get('/search', async ctx => {
+    let cookie = ctx.request.headers['cookie'];
+    let modules = await exerciseResult.getSearchModules(cookie);
+    await ctx.render('search', { modules: JSON.stringify(modules) });
 });
 
 router.get('/api/wrong-questions/:keypointId', async ctx => {
@@ -358,6 +441,7 @@ router.post('/quiz/:setId/submit', async ctx => {
                 uid: q.uid,
                 qNo: q.qNo,
                 origNo: q.origNo,
+                originalQuestionId: q.originalQuestionId || '',
                 type: q.type,
                 stem: q.stem,
                 options: q.options,
@@ -391,6 +475,7 @@ router.post('/quiz/:setId/submit', async ctx => {
             uid: q.uid,
             qNo: q.qNo,
             origNo: q.origNo,
+            originalQuestionId: q.originalQuestionId || '',
             type: q.type,
             stem: q.stem,
             options: q.options,
@@ -457,6 +542,22 @@ router.post('/quiz/:setId/submit', async ctx => {
 
     // 同步到 exercise_history 缓存（合并本地题库记录到练习记录）
     syncToExerciseHistory(ctx.userId, record);
+
+    // 艾宾浩斯复习题集提交：更新复习状态（custom_review_ 前缀）
+    if (setId.indexOf('custom_review_') === 0) {
+        try {
+            const reviewResults = questions
+                .filter(q => q.originalQuestionId && q.correct !== null)
+                .map(q => ({
+                    questionId: q.originalQuestionId,
+                    correct: q.correct
+                }));
+            const updated = reviewScheduler.updateReviewResults(ctx.userId, reviewResults);
+            console.log('[REVIEW] 复习结果更新: ' + updated + '/' + reviewResults.length + ' 题');
+        } catch (e) {
+            console.error('[REVIEW] 复习结果更新失败:', e.message);
+        }
+    }
 
     console.log('Quiz 提交: ' + set.setName + ' 正确率=' + accuracy + '% 用时=' + durationDesc);
     ctx.body = { recordId, accuracy, correctCount, wrongCount, unansweredCount };
@@ -526,6 +627,85 @@ router.post('/api/quiz/redo', async ctx => {
     } catch (e) {
         console.error('错题重做失败:', e.message, e.stack);
         ctx.body = { error: '构建重做题集失败: ' + e.message };
+        ctx.status = 500;
+    }
+});
+
+// ── 艾宾浩斯错题复习 ──
+
+// 获取今日复习概览
+router.get('/api/quiz/review/today', async ctx => {
+    try {
+        // 先同步新错题到复习队列
+        reviewScheduler.syncFromWrongCache(ctx.userId);
+        const stats = reviewScheduler.getReviewStats(ctx.userId);
+        const items = reviewScheduler.getTodayReview(ctx.userId);
+        ctx.body = {
+            stats,
+            dueCount: items.length,
+            // 返回前 10 题的预览（题干预览 80 字截断）
+            preview: items.slice(0, 10).map(item => ({
+                questionId: item.questionId,
+                stem: (item.stem || '').slice(0, 80),
+                stage: item.stage,
+                nextReviewTime: item.nextReviewTime,
+                source: item.source
+            }))
+        };
+    } catch (e) {
+        console.error('[REVIEW] 获取复习概览失败:', e.message);
+        ctx.body = { error: '获取复习概览失败: ' + e.message };
+        ctx.status = 500;
+    }
+});
+
+// 开始复习：构建复习题集（mode=due 仅到期题目，mode=all 全部未掌握题目）
+router.post('/api/quiz/review/start', async ctx => {
+    try {
+        const { mode } = ctx.request.body || {};
+        const items = mode === 'all'
+            ? reviewScheduler.getAllReviewable(ctx.userId)
+            : reviewScheduler.getTodayReview(ctx.userId);
+        const label = mode === 'all' ? '全部' : '到期';
+
+        if (items.length === 0) {
+            ctx.body = { error: '无' + label + '复习题目' };
+            ctx.status = 404;
+            return;
+        }
+
+        // 转为 quiz-play 格式（保留 originalQuestionId 用于复习状态更新）
+        const questions = items.map((item, i) => ({
+            uid: '',
+            setId: '',
+            source: '艾宾浩斯复习',
+            qNo: i + 1,
+            type: '单选',
+            stem: item.stem || '',
+            options: item.options || [],
+            answer: item.answer || '',
+            analysis: item.analysis || '',
+            knowledge: item.knowledge || '',
+            imageUrl: '',
+            analysisImageUrl: '',
+            originalQuestionId: item.questionId
+        })).filter(q => q.stem && q.options.length > 0 && q.answer);
+
+        if (questions.length === 0) {
+            ctx.body = { error: '复习题目数据解析失败' };
+            ctx.status = 404;
+            return;
+        }
+
+        const today = moment().format('YYYY-MM-DD');
+        const customId = 'custom_review_' + today + '_' + Date.now();
+        const setName = '每日复习(' + today + ') · ' + questions.length + '题';
+        quizLoader.registerCustomSet(customId, '艾宾浩斯复习', setName, questions);
+        console.log('[REVIEW] 复习题集已注册: ' + customId + ', ' + questions.length + ' 题');
+        ctx.body = { setId: customId, questionCount: questions.length };
+    } catch (e) {
+        console.error('[REVIEW] 开始复习失败:', e.message, e.stack);
+        ctx.body = { error: '构建复习题集失败: ' + e.message };
         ctx.status = 500;
     }
 });
@@ -870,6 +1050,61 @@ router.post('/api/quiz/export-pdf', async ctx => {
         ctx.body = pdfBuffer;
     } catch (e) {
         console.error('本地题库PDF导出失败:', e.message, e.stack);
+        ctx.body = { error: '导出失败: ' + e.message };
+        ctx.status = 500;
+    }
+});
+
+// 艾宾浩斯复习题目导出 PDF（按 recordId 导出整套复习题目，含对错标注）
+router.post('/api/quiz/export-review-pdf', async ctx => {
+    try {
+        const { recordId, hideAnswer } = ctx.request.body;
+        const record = quizRecord.getRecord(ctx.userId, recordId);
+        if (!record) {
+            ctx.body = { error: '复习记录不存在' };
+            ctx.status = 404;
+            return;
+        }
+
+        const pdfGenerator = require('./util/pdfGenerator');
+        // 导出全部复习题目（不只是错题）
+        const allQuestions = record.questions.filter(q => q.stem);
+
+        if (allQuestions.length === 0) {
+            ctx.body = { error: '复习记录无题目数据' };
+            ctx.status = 404;
+            return;
+        }
+
+        const pdfQuestions = allQuestions.map(q => ({
+            content: q.stem,
+            options: q.options,
+            correctAnswer: { choice: q.answer, type: 201 },
+            source: record.setName + ' 第' + q.qNo + '题',
+            tags: [],
+            keypoints: [record.source, q.knowledge].filter(Boolean),
+            solution: q.analysis,
+            _myAnswer: q.myAnswer,
+            _flagged: q.flagged,
+            _correct: q.correct
+        }));
+
+        const categoryName = record.setName + ' · 复习题目';
+        const pdfBuffer = await pdfGenerator.generateWrongQuestionsPDF({
+            categoryName: categoryName,
+            questions: pdfQuestions,
+            start: 1,
+            end: pdfQuestions.length,
+            hideAnswer: hideAnswer === true
+        });
+
+        const fileSuffix = hideAnswer === true ? '' : '（解析）';
+        const fileName = encodeURIComponent(record.setName + fileSuffix + '.pdf');
+        ctx.set('Content-Type', 'application/pdf');
+        ctx.set('Content-Disposition', `inline; filename*=UTF-8''${fileName}`);
+        ctx.body = pdfBuffer;
+    } catch (e) {
+        console.error('复习题目PDF导出失败:', e.message, e.stack);
         ctx.body = { error: '导出失败: ' + e.message };
         ctx.status = 500;
     }

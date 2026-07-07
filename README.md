@@ -97,6 +97,17 @@
 - **随机抽样**：聚合所有勾选题套的题目后采用 Fisher-Yates 洗牌算法随机抽取指定数量
 - **临时题集**：自定义题集以 `custom_时间戳` 为 ID 存于内存缓存，复用现有做题/判分/结果页流程
 
+### 艾宾浩斯错题复习
+- **遗忘曲线调度**：基于经典艾宾浩斯遗忘曲线 6 次复习间隔（1天 → 2天 → 4天 → 7天 → 15天 → 30天），自动安排错题复习计划
+- **自动入队**：访问错题本页面时自动扫描全部错题缓存（粉笔错题 + 本地题库错题），新错题自动进入复习队列，无需手动添加
+- **每日复习卡片**：错题本顶部紫色卡片展示今日待复习题数、各阶段分布条形图、已掌握题数；无复习任务时自动隐藏
+- **双模式复习**：卡片提供「复习到期」（仅今日 nextReviewTime ≤ now 的题）与「立即复习全部」（队列中所有未掌握题）两种入口
+- **复习规划页面**：独立路由 `/review-plan`，选定起点日期 D 后绘制未来 30 天复习量 ECharts 曲线图（D+1 / D+2 / D+4 / D+7 / D+15 / D+30 六个阶段日高亮），点击曲线节点可切换详情面板查看当日题目清单；「应用此计划」把每道未掌握题的 `nextReviewTime` 重排为 `D + INTERVALS_DAYS[stage]`，stage 保留不重置（用户已复习进度不丢失）；已掌握题自动排除
+- **一键开始**：点击「开始复习 N 题」构建复习题集，跳转做题页；复用现有 quiz-play 做题/判分/结果页流程
+- **复习状态自动更新**：提交复习题集后（`custom_review_` 前缀），自动按判分结果更新每题复习阶段——答对进入下一阶段，答错重置到第 1 阶段；完成全部 6 次复习标记为「已掌握」
+- **独立状态文件**：复习进度持久化在 `cache/wrong_review_state_<userId>.json`（365 天有效期），不污染现有错题缓存结构，服务重启不丢失
+- **用户隔离**：复习状态按 userId 隔离，与错题本、练习记录一致
+
 ### 登录与认证
 - 支持粉笔网账号密码登录（含图形验证码）
 - Cookie 本地缓存，自动续期
@@ -121,18 +132,25 @@ fenbi-helper-master/
 │   │   ├── exercisesResult.js     # 核心业务：练习记录 / 错题本 / 词语统计
 │   │   └── loginService.js        # 登录服务
 │   ├── util/
+│   │   ├── auth.js                # 权限中间件（requireLogin / requireAdmin）
 │   │   ├── cacheUtil.js           # 本地 JSON 文件缓存
 │   │   ├── httpUtil.js            # 粉笔 API 请求封装
 │   │   ├── idiomDict.js           # 成语词典加载（CSV → 内存 Map）
 │   │   ├── pdfGenerator.js        # 错题本 PDF 生成器
 │   │   ├── quizLoader.js          # 本地题库加载（xlsx → 内存）
-│   │   └── quizRecord.js          # 本地题库练习记录管理
+│   │   ├── quizRecord.js          # 本地题库练习记录管理
+│   │   ├── reviewScheduler.js     # 艾宾浩斯错题复习调度器
+│   │   └── userStore.js           # 用户表管理（角色、手机号关联、数据迁移）
 │   └── views/
+│       ├── partials/             # EJS partial 组件
+│       │   ├── navbar.ejs        # 导航栏 partial（activePage 高亮 + 用户信息 + 设备 badge）
+│       │   └── page-hero.ejs     # 页面头部 partial（title / subtitle / actions）
 │       ├── exerciseResult.ejs     # 练习报告详情页
 │       ├── history-category-complex.ejs  # 分类聚合历史页（首页）
 │       ├── history-category.ejs   # 分类历史页
 │       ├── history.ejs            # 历史记录页
 │       ├── wrong-questions.ejs     # 错题本页
+│       ├── review-plan.ejs        # 艾宾浩斯复习规划页（曲线图 + 阶段预测）
 │       ├── word-frequency.ejs     # 词语频次统计页
 │       ├── word-stats.ejs         # 词语统计页
 │       ├── question.ejs           # 单题详情页
@@ -192,7 +210,11 @@ node src/app.js
 | `/exercise/:exerciseId` | 练习报告详情（含耗时图、题目列表、词语统计） |
 | `/question/:questionId` | 单题详情 |
 | `/wrong-questions` | 错题本 |
+| `/review-plan` | 艾宾浩斯复习规划页（曲线图 + 阶段预测 + 应用计划） |
 | `/word-frequency` | 词语频次统计 |
+| `/word-stats` | 高频词语统计 |
+| `/idioms` | 成语词典 |
+| `/search` | 搜索页 |
 | `/shenlun-format` | 申论公文格式速查 |
 | `/quiz` | 本地题库选择页 |
 | `/quiz/custom` | 自定义出题（勾选题套 + 数量，Fisher-Yates 抽样） |
@@ -207,9 +229,14 @@ node src/app.js
 | `/api/quiz/trash` | 列出回收站中可恢复的题库（含剩余恢复时间） |
 | `/api/quiz/restore` | 从回收站恢复题库（移回 uploaded-quizzes/ + 恢复配置） |
 | `/api/quiz/export-pdf` | 本地题库结果导出 PDF（错题+疑题） |
+| `/api/quiz/export-review-pdf` | 艾宾浩斯复习题目导出 PDF（按 recordId 导出整套复习题目，含对错标注，支持隐藏答案） |
 | `/api/quiz/export-set-pdf` | 本地题库题套导出 PDF（按 setId 导出整套题，支持范围与隐藏答案） |
 | `/api/export-daily-wrong-pdf` | 按日期导出当日错题 PDF（含词语统计页，支持 `exerciseIds` 按练习过滤，`attachment` 下载方式） |
 | `/api/quiz/redo` | 当日错题重做：构建 `custom_redo_<date>_<ts>` 内存题集，返回 `{setId, questionCount}` |
+| `/api/quiz/review/today` | 艾宾浩斯复习：获取今日待复习概览（同步新错题入队 + 返回统计与预览） |
+| `/api/quiz/review/start` | 艾宾浩斯复习：构建 `custom_review_<date>_<ts>` 复习题集，返回 `{setId, questionCount}` |
+| `/api/quiz/review/plan` | 艾宾浩斯复习规划：按 `startDate` 模拟未来 30 天复习量曲线与阶段日详情（不写入状态） |
+| `/api/quiz/review/apply-plan` | 艾宾浩斯复习规划：把模拟计划写入 `nextReviewTime`（保留 stage，仅重排时间） |
 | `/api/word-frequency/refresh` | 手动刷新词语统计缓存 |
 | `/api/wrong-questions-by-ids` | 按 ID 批量获取题目详情 |
 | `/api/debug/exercises` | 调试接口（探查分类与练习数据） |
@@ -272,6 +299,10 @@ docker run -d -p 3000:3000 -v $(pwd)/cache:/app/cache fenbi-helper
 
 ## 历史更新
 
+- **2026-07-08** 前端导航栏与页面布局统一化：提取 `src/views/partials/navbar.ejs` 和 `src/views/partials/page-hero.ejs` 两个 EJS partial，13 个页面导航栏改用 `<%- include('./partials/navbar.ejs', { activePage: 'xxx' }) %>` 引入，消除各页面内联 navbar 重复代码；导航项分组为 7 个主干平铺（练习总览/每日记录/错题复习/题库刷题/词频分析/高频词语/成语词典）+ 工具下拉（公文速查/速算练习）；`app.js` 新增全局变量注入中间件，`ctx.state` 自动携带 `userPhone`/`isAdmin`，所有 `ctx.render` 调用无需手动传参；修复 navbar partial 中 `<%= %>`（HTML 转义）导致 `class="active"` 渲染为 `class=&#34;active&#34;` 的高亮失效 bug，改为 `<%- %>`（不转义）；补全 3 个缺失路由（`/word-stats`、`/idioms`、`/search`），其中 `/search` 路由调用 `exerciseResult.getSearchModules(cookie)` 获取搜索模块列表传入模板
+- **2026-07-07** 新增艾宾浩斯复习规划页面：新建 `src/views/review-plan.ejs`（紫色主题，ECharts 曲线图 + 阶段预测面板 + 详情面板 + 操作区），`reviewScheduler.js` 新增 `simulatePlan(userId, startDate)` 与 `applyPlan(userId, startDate)` 两个函数——前者按起点日期 D 模拟未来 30 天复习量曲线（D+1 / D+2 / D+4 / D+7 / D+15 / D+30 六个阶段日高亮）+ 6 个阶段日详情，后者把每道未掌握题的 `nextReviewTime` 重排为 `D + INTERVALS_DAYS[stage]`（stage 保留不重置，已掌握题自动排除）；app.js 新增 `GET /review-plan`（页面）、`GET /api/quiz/review/plan`（模拟数据）、`POST /api/quiz/review/apply-plan`（写入状态）三条路由；wrong-questions.ejs 复习卡片按钮组新增「复习规划 →」紫色虚线入口跳转 `/review-plan`；9/9 单元测试通过（入队/阶段推进/simulatePlan/applyPlan/已掌握过滤/无效日期）
+- **2026-07-07** 新增艾宾浩斯遗忘曲线错题复习功能：新建 `src/util/reviewScheduler.js` 调度器，经典 6 次复习间隔（1天 → 2天 → 4天 → 7天 → 15天 → 30天），答对进入下一阶段、答错重置到第 1 阶段、完成 6 次复习标记为「已掌握」；复习状态持久化到 `cache/wrong_review_state_<userId>.json`（365 天有效，按 userId 隔离）；`exercisesResult.js` 的 `getWrongQuestions` 自动扫描全部错题缓存（粉笔+本地）同步新错题入队；app.js 新增 `GET /api/quiz/review/today`（复习概览）、`POST /api/quiz/review/start`（构建 `custom_review_<date>_<ts>` 复习题集）、`POST /api/quiz/export-review-pdf`（按 recordId 导出整套复习题目 PDF）三条路由，`/quiz/:setId/submit` 识别 `custom_review_` 前缀自动更新复习状态；wrong-questions.ejs 顶部新增紫色「每日复习」卡片（今日待复习题数、阶段分布条形图、已掌握数、开始按钮）；history.ejs 每日记录列表中艾宾浩斯复习记录显示紫色「复习」标签与「导出题目」按钮（支持导出含解析/纯题目两种版本）
+- **2026-07-07** 用户表手机号关联强化：`userStore.js` 的 `upsertUser` 新增 `phoneRaw` 字段（完整手机号）用于跨 userId 关联同一用户，userId 变化时自动调用 `migrateUserCache` 迁移缓存文件（`<key>_<old>.json` → `<key>_<new>.json`、`wrong_q_<old>_<kpId>.json` → `wrong_q_<new>_<kpId>.json`）；三级关联策略：优先按 phoneRaw → 按 userId → 新建；兼容旧数据（无 phoneRaw 字段时下次登录自动补全）
 - **2026-07-07** 题库软删除/回收站机制：卸载题库不再直接删除文件，改为移动到 `.deleted-quizzes/` 目录并记录元数据到 `trash.json`，保留 2 天可恢复；quizLoader.js 新增 `moveToTrash` / `restoreFromTrash` / `listTrash` / `cleanupTrash` 四个函数，`loadAll()` 启动时调用 `cleanupTrash()` 永久删除超期项；app.js `/api/quiz/uninstall` 路由从永久删除改为 `moveToTrash()`，新增 `GET /api/quiz/trash`（列出可恢复题库）和 `POST /api/quiz/restore`（恢复题库）路由；quiz-list.ejs 分类页底部新增可折叠「回收站」区域（每项显示题库名、删除时间、剩余恢复小时数），`uninstallQuiz()` 确认提示更新为「移入回收站，2 天内可恢复，超期永久删除」
 - **2026-07-07** 设备指纹识别：新增 `src/views/js/device.js`，收集 Canvas 指纹 + WebGL 指纹 + UA/屏幕/时区等 10 项特征，FNV-1a 双重 hash 输出 16 位 hex 存入 localStorage + 10 年 cookie；重写 XHR 和 fetch 自动注入 `X-Device-Id` header；app.js 新增 HTML 自动注入中间件（在 `</body>` 前注入 device.js）+ 设备识别中间件（注入 `ctx.deviceId`，访问日志含 deviceId）；history-category-complex.ejs navbar 显示指纹前 8 位徽章
 - **2026-07-06** 项目不再内置题库：`QUIZ_DIRS` 改为空数组，移除片段阅读600题、花生逻辑推理600题、红领巾言语理解600题三个内置配置；所有题库均通过上传功能添加，配置持久化到 `uploaded-quizzes/config.json`；启动时自动清理目录不存在的动态配置；新增 `start.bat` 启动脚本（自动检查 Node.js、首次运行 `npm install`、显示本机与局域网访问地址）

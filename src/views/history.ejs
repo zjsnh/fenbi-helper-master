@@ -109,6 +109,30 @@
       background: var(--brand-700, #0052a3);
       color: #fff;
     }
+    .export-review-btn {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 14px;
+      border-radius: 8px;
+      border: 0.5px solid #d8b4fe;
+      background: #f3e8ff;
+      color: #7c3aed;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: all 0.2s var(--ease-out);
+      font-family: inherit;
+    }
+    .export-review-btn:hover {
+      background: #e9d5ff;
+      border-color: #c084fc;
+      transform: translateY(-1px);
+    }
+    .export-review-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
     .sel-count {
       font-size: 11px;
       color: var(--g-700);
@@ -228,17 +252,7 @@
   </style>
 </head>
 <body>
-<div class="navbar">
-  <a href="/history-category-complex" class="logo"><img src="/logo.svg" alt="">错题助手</a>
-  <a href="/history-category-complex">练习记录</a>
-  <a href="/history" class="active">列表视图</a>
-  <a href="/wrong-questions">错题本</a>
-  <a href="/word-frequency">词语统计</a>
-  <a href="/quiz">本地题库</a>
-  <a href="/shenlun-format">公文格式</a>
-  <% if (typeof userPhone !== 'undefined' && userPhone) { %><span class="nav-user"><span class="user-phone"><%= userPhone %></span><% if (typeof isAdmin !== 'undefined' && isAdmin) { %><span class="admin-badge">管理员<span class="admin-tooltip"><span class="tip-title">👑 管理员权限</span><span class="tip-item">卸载题库</span><span class="tip-item">恢复题库</span><span class="tip-item">查看回收站</span></span></span><% } %></span><% } else { %><span style="margin-left:auto;"></span><% } %>
-  <a href="/setup">切换账号</a>
-</div>
+<%- include('./partials/navbar.ejs', { activePage: 'history' }) %>
 
 <div class="container list-view">
   <% if (total == 0) { %>
@@ -283,6 +297,8 @@
         var localTitle = isLocalQuiz
           ? ((h.source || '本地题库') + ' · ' + (h.sheet.questionCount || h.questionCount || 0) + '题')
           : cleanTitle(h.sheet.name);
+        // 艾宾浩斯复习记录识别
+        var isReview = isLocalQuiz && h.source === '艾宾浩斯复习';
       %>
         <div class="ex-row" onclick="showReport('<%= h.id %>', <%= isLocalQuiz %>)">
           <input type="checkbox" class="ex-cb" data-date="<%= dateKey %>" data-id="<%= h.id %>" onclick="event.stopPropagation()" onchange="onExerciseSelect(this, '<%= dateKey %>')">
@@ -290,14 +306,17 @@
           <div class="main">
             <div class="title">
               <%= localTitle %>
-              <% if (isLocalQuiz) { %> <span style="font-size:11px;color:#0066cc;background:#e6f0ff;padding:1px 7px;border-radius:8px;border:1px solid #b8d4ff;margin-left:6px;font-weight:600;">本地题库</span><% } %>
+              <% if (isReview) { %> <span style="font-size:11px;color:#7c3aed;background:#f3e8ff;padding:1px 7px;border-radius:8px;border:1px solid #d8b4fe;margin-left:6px;font-weight:600;">复习</span><% } else if (isLocalQuiz) { %> <span style="font-size:11px;color:#0066cc;background:#e6f0ff;padding:1px 7px;border-radius:8px;border:1px solid #b8d4ff;margin-left:6px;font-weight:600;">本地题库</span><% } %>
             </div>
             <div class="meta">
               <span><%= h.answerCount %> 题</span>
               <span><%= Math.round(moment.duration(h.elapsedTime,'seconds').asMinutes().toFixed(1)) %> 分钟</span>
-              <span><%= isLocalQuiz ? '本地题库' : (h.client==='WEB'||h.client==='APP_WEB'?'电脑端':'手机端') %></span>
+              <span><%= isLocalQuiz ? (isReview ? '艾宾浩斯复习' : '本地题库') : (h.client==='WEB'||h.client==='APP_WEB'?'电脑端':'手机端') %></span>
             </div>
           </div>
+          <% if (isReview) { %>
+            <button class="export-review-btn" onclick="event.stopPropagation(); exportReviewPdf('<%= h.id %>', this)" title="导出本次复习全部题目 PDF">导出题目</button>
+          <% } %>
           <span class="time"><%= moment(h.updatedTime).format('HH:mm') %></span>
         </div>
       <% } %>
@@ -353,6 +372,41 @@
         redoBtn.innerText = '重做当日错题';
       }
     }
+  }
+
+  // 导出艾宾浩斯复习题目 PDF
+  function exportReviewPdf(recordId, btn) {
+    if (!recordId) return;
+    var withAnswer = confirm('导出复习题目 PDF：\n\n点击「确定」导出含答案与解析的版本\n点击「取消」导出纯题目版本（隐藏答案）');
+    var originHTML = btn.innerHTML;
+    btn.disabled = true;
+    btn.textContent = '导出中...';
+    fetch('/api/quiz/export-review-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recordId: recordId, hideAnswer: !withAnswer })
+    })
+    .then(function(r) {
+      if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || '导出失败'); });
+      return r.blob();
+    })
+    .then(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = (withAnswer ? '复习题目（解析）' : '复习题目') + '.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    })
+    .catch(function(e) {
+      alert('导出失败：' + e.message);
+    })
+    .finally(function() {
+      btn.disabled = false;
+      btn.innerHTML = originHTML;
+    });
   }
 
   // 按日期重做当日错题（支持不选时重做全部，勾选后仅重做所选练习的错题）

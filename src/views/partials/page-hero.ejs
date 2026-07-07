@@ -1,0 +1,15 @@
+<%
+  const hasActions = typeof actions !== 'undefined' && actions;
+  const heroStyle = hasActions ? 'display:flex;align-items:center;justify-content:space-between;' : '';
+%>
+<div class="page-hero"<%= heroStyle ? ' style="' + heroStyle + '"' : '' %>>
+  <div>
+    <div class="hero-title"><%= typeof title !== 'undefined' ? title : '' %></div>
+    <% if (typeof subtitle !== 'undefined' && subtitle) { %>
+    <div class="hero-sub"><%= subtitle %></div>
+    <% } %>
+  </div>
+  <% if (hasActions) { %>
+  <div class="hero-actions"><%- actions %></div>
+  <% } %>
+</div>

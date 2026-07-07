@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>复习规划 · 错题助手</title>
+  <link rel="stylesheet" href="/theme.css">
+  <script src="/echarts.min.js"></script>
+  <style>
+    body { background: var(--paper); }
+
+    .page-hero {
+      background:
+        radial-gradient(ellipse at 25% 0%, rgba(123,58,237,0.08) 0%, transparent 55%),
+        linear-gradient(180deg, var(--paper-warm) 0%, var(--paper) 100%);
+      padding: 40px 0 20px;
+      margin: -40px -28px 28px;
+      padding-left: 28px;
+      padding-right: 28px;
+      position: relative;
+      overflow: hidden;
+    }
+    .page-hero::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 28px; right: 28px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(123,58,237,0.4), transparent);
+    }
+    .page-hero .hero-title {
+      font-size: 26px;
+      font-weight: 800;
+      font-family: var(--font-display);
+      color: var(--g-800);
+      letter-spacing: -0.5px;
+      position: relative;
+      z-index: 1;
+    }
+    .page-hero .hero-sub {
+      font-size: 13px;
+      color: var(--ink-500);
+      margin-top: 6px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .breadcrumb .crumb {
+      color: var(--g-600);
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .breadcrumb .crumb:hover { color: var(--g-800); }
+    .breadcrumb .sep { color: var(--g-300); }
+
+    .plan-layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 24px;
+      margin-bottom: 28px;
+    }
+    @media (max-width: 900px) {
+      .plan-layout { grid-template-columns: 1fr; }
+    }
+
+    /* 日期选择面板 */
+    .date-panel {
+      background: #fff;
+      border: 1px solid var(--g-200);
+      border-radius: 14px;
+      padding: 22px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+      height: fit-content;
+    }
+    .date-panel .panel-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--g-800);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .date-panel .panel-title::before {
+      content: '';
+      width: 3px; height: 14px;
+      background: #7b58df;
+      border-radius: 2px;
+    }
+    .date-input-row { margin-bottom: 14px; }
+    .date-input-row label {
+      display: block;
+      font-size: 12px;
+      color: var(--ink-500);
+      margin-bottom: 6px;
+    }
+    .date-input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--g-300);
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      color: var(--g-800);
+      background: #fff;
+      box-sizing: border-box;
+    }
+    .date-input:focus {
+      outline: none;
+      border-color: #7b58df;
+      box-shadow: 0 0 0 3px rgba(123,88,223,0.12);
+    }
+    .quick-btns {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .quick-btn {
+      flex: 1;
+      padding: 8px;
+      background: var(--paper-warm);
+      border: 1px solid var(--g-200);
+      border-radius: 8px;
+      font-size: 12px;
+      color: var(--g-700);
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    .quick-btn:hover {
+      background: rgba(123,88,223,0.08);
+      border-color: #7b58df;
+      color: #7b58df;
+    }
+    .confirm-btn {
+      width: 100%;
+      padding: 10px;
+      background: #7b58df;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s;
+      margin-bottom: 14px;
+      box-shadow: 0 2px 8px rgba(123,88,223,0.3);
+    }
+    .confirm-btn:hover {
+      background: #6b4ccf;
+      box-shadow: 0 4px 12px rgba(123,88,223,0.4);
+    }
+    .confirm-btn:active { transform: scale(0.98); }
+    .range-info {
+      padding: 10px 12px;
+      background: var(--paper-warm);
+      border-radius: 8px;
+      font-size: 12px;
+      color: var(--ink-500);
+      line-height: 1.6;
+    }
+    .range-info b { color: var(--g-700); font-weight: 600; }
+
+    /* 曲线图区 */
+    .chart-panel {
+      background: #fff;
+      border: 1px solid var(--g-200);
+      border-radius: 14px;
+      padding: 22px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+    .chart-panel .panel-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--g-800);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .chart-panel .panel-title::before {
+      content: '';
+      width: 3px; height: 14px;
+      background: #7b58df;
+      border-radius: 2px;
+    }
+    #review-chart {
+      width: 100%;
+      height: 320px;
+    }
+    .chart-tip {
+      font-size: 12px;
+      color: var(--ink-400);
+      margin-top: 8px;
+      text-align: center;
+    }
+
+    /* 阶段预测面板 */
+    .stages-panel {
+      margin-bottom: 28px;
+    }
+    .stages-panel .panel-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--g-800);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .stages-panel .panel-title::before {
+      content: '';
+      width: 3px; height: 14px;
+      background: #7b58df;
+      border-radius: 2px;
+    }
+    .predict-summary {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+      padding: 14px 18px;
+      background: linear-gradient(135deg, rgba(123,88,223,0.06) 0%, rgba(123,88,223,0.02) 100%);
+      border: 1px solid rgba(123,88,223,0.15);
+      border-radius: 10px;
+    }
+    .predict-item {
+      flex: 1;
+      min-width: 120px;
+    }
+    .predict-item .pi-lbl {
+      font-size: 11px;
+      color: var(--ink-400);
+      margin-bottom: 4px;
+    }
+    .predict-item .pi-val {
+      font-size: 16px;
+      font-weight: 700;
+      color: #7b58df;
+      font-family: var(--font-display);
+    }
+    .predict-item .pi-sub {
+      font-size: 11px;
+      color: var(--ink-400);
+      margin-top: 2px;
+    }
+    .stages-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 12px;
+    }
+    @media (max-width: 900px) {
+      .stages-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 600px) {
+      .stages-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    .stage-cell {
+      background: #fff;
+      border: 1px solid var(--g-200);
+      border-radius: 12px;
+      padding: 16px 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .stage-cell::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, rgba(123,88,223,0.4), rgba(123,88,223,0.7));
+    }
+    .stage-cell:hover {
+      border-color: #7b58df;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(123,88,223,0.15);
+    }
+    .stage-cell.active {
+      border-color: #7b58df;
+      background: rgba(123,88,223,0.05);
+    }
+    .stage-cell .sc-day {
+      font-size: 11px;
+      color: var(--ink-400);
+      margin-bottom: 4px;
+    }
+    .stage-cell .sc-offset {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--g-700);
+      margin-bottom: 8px;
+    }
+    .stage-cell .sc-count {
+      font-size: 24px;
+      font-weight: 800;
+      color: #7b58df;
+      line-height: 1;
+      font-family: var(--font-display);
+    }
+    .stage-cell .sc-unit {
+      font-size: 11px;
+      color: var(--ink-400);
+      margin-top: 4px;
+    }
+
+    /* 详情面板 */
+    .detail-panel {
+      background: #fff;
+      border: 1px solid var(--g-200);
+      border-radius: 14px;
+      padding: 22px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+      margin-bottom: 28px;
+    }
+    .detail-panel .panel-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--g-800);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .detail-panel .panel-title::before {
+      content: '';
+      width: 3px; height: 14px;
+      background: #7b58df;
+      border-radius: 2px;
+    }
+    .detail-empty {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--ink-400);
+      font-size: 13px;
+    }
+    .detail-list {
+      max-height: 400px;
+      overflow-y: auto;
+      border: 1px solid var(--g-100);
+      border-radius: 8px;
+    }
+    .detail-item {
+      display: flex;
+      gap: 10px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--g-100);
+      font-size: 13px;
+      line-height: 1.6;
+      align-items: flex-start;
+    }
+    .detail-item:last-child { border-bottom: none; }
+    .detail-item:hover { background: var(--paper-warm); }
+    .detail-item .di-num {
+      flex-shrink: 0;
+      width: 22px; height: 22px;
+      background: rgba(123,88,223,0.1);
+      color: #7b58df;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .detail-item .di-stem {
+      flex: 1;
+      color: var(--g-700);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+    .detail-item .di-tag {
+      flex-shrink: 0;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: var(--g-100);
+      color: var(--g-600);
+    }
+    .detail-item .di-tag.local {
+      background: rgba(0,102,204,0.1);
+      color: #0066cc;
+    }
+    .detail-item .di-tag.fenbi {
+      background: rgba(255,159,67,0.15);
+      color: #b06a00;
+    }
+
+    /* 操作区 */
+    .action-bar {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      padding: 20px 0;
+      border-top: 1px solid var(--g-100);
+    }
+    .btn {
+      padding: 10px 22px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+    .btn-ghost {
+      background: #fff;
+      border: 1px solid var(--g-300);
+      color: var(--g-700);
+    }
+    .btn-ghost:hover { background: var(--paper-warm); }
+    .btn-primary {
+      background: #7b58df;
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(123,88,223,0.3);
+    }
+    .btn-primary:hover {
+      background: #6b4ccf;
+      box-shadow: 0 4px 12px rgba(123,88,223,0.4);
+    }
+    .btn-primary:disabled {
+      background: var(--g-300);
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    .warning-text {
+      font-size: 12px;
+      color: var(--ink-400);
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+
+    /* 空状态 */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--ink-400);
+    }
+    .empty-state .empty-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+      opacity: 0.5;
+    }
+    .empty-state .empty-text {
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-100px);
+      background: var(--g-800);
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 10000;
+      opacity: 0;
+      transition: all 0.3s var(--ease-spring);
+      pointer-events: none;
+    }
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+    .toast.success { background: #16a34a; }
+    .toast.error { background: #dc2626; }
+  </style>
+</head>
+<body>
+
+<%- include('./partials/navbar.ejs', { activePage: 'wrong-questions' }) %>
+
+<div class="container-wide">
+  <div class="breadcrumb">
+    <a class="crumb" href="/wrong-questions">← 返回错题复习</a>
+    <span class="sep">/</span>
+    <span class="crumb" style="color: var(--g-800); cursor: default;">复习规划</span>
+  </div>
+
+  <div class="page-hero">
+    <div class="hero-title">复习规划</div>
+    <div class="hero-sub">选择起点日期，按艾宾浩斯间隔（1/2/4/7/15/30 天）重排复习计划</div>
+  </div>
+
+  <% if (stats.total === 0 && stats.mastered === 0) { %>
+    <div class="empty-hint" style="padding:14px 18px;margin-bottom:20px;background:rgba(123,88,223,0.06);border:1px solid rgba(123,88,223,0.15);border-radius:10px;color:var(--ink-500);font-size:13px;line-height:1.6;">
+      <b style="color:#7b58df;">提示：</b>复习队列当前为空。去练习并刷新每日记录后，当天产生的错题会自动入队，下方规划面板会显示对应阶段复习量。
+      <a href="/wrong-questions" style="color:#7b58df;margin-left:6px;">去错题复习 →</a>
+    </div>
+  <% } %>
+
+    <!-- 统计概览 -->
+    <div class="stats-row" style="margin-bottom: 24px;">
+      <div class="stat-card">
+        <div class="num"><%= stats.total %></div>
+        <div class="lbl">队列中题目</div>
+      </div>
+      <div class="stat-card">
+        <div class="num"><%= stats.dueToday %></div>
+        <div class="lbl">今日待复习</div>
+      </div>
+      <div class="stat-card">
+        <div class="num"><%= stats.upcoming %></div>
+        <div class="lbl">未来待复习</div>
+      </div>
+      <div class="stat-card">
+        <div class="num"><%= stats.mastered %></div>
+        <div class="lbl">已掌握</div>
+      </div>
+    </div>
+
+    <!-- 日期选择 + 曲线图 -->
+    <div class="plan-layout">
+      <div class="date-panel">
+        <div class="panel-title">起点日期</div>
+        <div class="date-input-row">
+          <label>选择起点 D</label>
+          <input type="date" id="start-date" class="date-input" value="<%= defaultStartDate %>" onchange="loadPlan()">
+        </div>
+        <div class="quick-btns">
+          <div class="quick-btn" onclick="setDate('today')">今天</div>
+          <div class="quick-btn" id="earliest-btn">最早错题日</div>
+        </div>
+        <button class="confirm-btn" onclick="loadPlan()">生成复习计划</button>
+        <div class="range-info" id="range-info">
+          可选范围：<br>
+          <b id="range-earliest">-</b> ~ <b id="range-latest">-</b>
+        </div>
+      </div>
+
+      <div class="chart-panel">
+        <div class="panel-title">艾宾浩斯复习曲线</div>
+        <div id="review-chart"></div>
+        <div class="chart-tip">点击节点查看当日详情</div>
+      </div>
+    </div>
+
+    <!-- 阶段预测面板 -->
+    <div class="stages-panel">
+      <div class="panel-title">阶段预测</div>
+      <div class="predict-summary" id="predict-summary">
+        <!-- 由 JS 动态填充预测汇总 -->
+      </div>
+      <div class="stages-grid" id="stages-grid">
+        <!-- 由 JS 动态填充 6 个阶段卡片 -->
+      </div>
+    </div>
+
+    <!-- 选中日期详情 -->
+    <div class="detail-panel">
+      <div class="panel-title" id="detail-title">选中日期详情</div>
+      <div id="detail-content">
+        <div class="detail-empty">点击上方曲线节点或阶段卡片查看详情</div>
+      </div>
+    </div>
+
+    <!-- 操作区 -->
+    <div class="action-bar">
+      <button class="btn btn-ghost" onclick="window.location.href='/wrong-questions'">取消</button>
+      <button class="btn btn-primary" id="apply-btn" onclick="applyPlan()">应用此计划</button>
+    </div>
+    <div class="warning-text">
+      ⚠ 应用后所有未掌握题目的下次复习时间将按起点 D 重排，已复习阶段进度保留不变
+    </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var currentPlan = null;
+var chart = null;
+var selectedDate = null;
+
+function showToast(msg, type) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + (type || '');
+  setTimeout(function() { t.className = 'toast'; }, 2500);
+}
+
+function fmtDate(d) {
+  var y = d.getFullYear();
+  var m = String(d.getMonth() + 1).padStart(2, '0');
+  var day = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + day;
+}
+
+function setDate(type) {
+  if (type === 'today') {
+    document.getElementById('start-date').value = fmtDate(new Date());
+  }
+  loadPlan();
+}
+
+function loadPlan() {
+  var startDate = document.getElementById('start-date').value;
+  if (!startDate) {
+    showToast('请先选择起点日期', 'error');
+    return;
+  }
+
+  var btn = document.querySelector('.confirm-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '生成中...'; }
+
+  fetch('/api/quiz/review/plan?startDate=' + encodeURIComponent(startDate))
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function(data) {
+      if (btn) { btn.disabled = false; btn.textContent = '生成复习计划'; }
+      if (data.error) {
+        showToast(data.error, 'error');
+        return;
+      }
+      currentPlan = data;
+      renderRange(data.dateRange);
+      renderChart(data.chartData, startDate);
+      renderPredictSummary(data, startDate);
+      renderStages(data.days);
+      // 默认选中第一个有题目的阶段日
+      var firstNonEmpty = data.days.find(function(d) { return d.count > 0; });
+      if (firstNonEmpty) {
+        selectDate(firstNonEmpty.date, firstNonEmpty);
+      } else {
+        renderDetail(null);
+      }
+    })
+    .catch(function(e) {
+      if (btn) { btn.disabled = false; btn.textContent = '生成复习计划'; }
+      showToast('加载计划失败: ' + e.message, 'error');
+    });
+}
+
+function renderPredictSummary(plan, startDate) {
+  var el = document.getElementById('predict-summary');
+  if (!el) return;
+
+  var total = plan.totalQuestions || 0;
+  var peakDay = null;
+  var peakCount = 0;
+  plan.days.forEach(function(d) {
+    if (d.count > peakCount) { peakCount = d.count; peakDay = d; }
+  });
+  var lastDay = plan.days[plan.days.length - 1] || null;
+  var totalReviewTasks = plan.days.reduce(function(s, d) { return s + d.count; }, 0);
+
+  var html = '';
+  html += '<div class="predict-item"><div class="pi-lbl">待规划题目</div><div class="pi-val">' + total + '</div><div class="pi-sub">道未掌握题</div></div>';
+  html += '<div class="predict-item"><div class="pi-lbl">峰值复习日</div><div class="pi-val">' + (peakDay ? peakDay.count : 0) + '</div><div class="pi-sub">' + (peakDay ? peakDay.date : '-') + (peakDay ? ' (D+' + peakDay.dayOffset + ')' : '') + '</div></div>';
+  html += '<div class="predict-item"><div class="pi-lbl">累计复习次数</div><div class="pi-val">' + totalReviewTasks + '</div><div class="pi-sub">6 个阶段日合计</div></div>';
+  html += '<div class="predict-item"><div class="pi-lbl">计划完成日</div><div class="pi-val">' + (lastDay ? lastDay.date : '-') + '</div><div class="pi-sub">D+' + (lastDay ? lastDay.dayOffset : 30) + ' 最后阶段</div></div>';
+  el.innerHTML = html;
+}
+
+function renderRange(range) {
+  document.getElementById('range-earliest').textContent = range.earliest;
+  document.getElementById('range-latest').textContent = range.latest;
+}
+
+function renderChart(chartData, startDate) {
+  var dom = document.getElementById('review-chart');
+  if (!chart) {
+    chart = echarts.init(dom);
+  }
+
+  // 只取 6 个阶段日（D+1/D+2/D+4/D+7/D+15/D+30），用柱状图展示更直观
+  var stageDays = currentPlan.days || [];
+  var dates = stageDays.map(function(d) { return d.date; });
+  var counts = stageDays.map(function(d) { return d.count; });
+  var stageLabels = ['第1次\nD+1', '第2次\nD+2', '第3次\nD+4', '第4次\nD+7', '第5次\nD+15', '第6次\nD+30'];
+
+  chart.setOption({
+    tooltip: {
+      trigger: 'axis',
+      formatter: function(params) {
+        var p = params[0];
+        var idx = p.dataIndex;
+        var label = stageLabels[idx] ? stageLabels[idx].replace('\n', ' ') : '';
+        return p.name + '<br/>' + label + '<br/>复习题数: ' + p.value + ' 题';
+      }
+    },
+    grid: { left: 50, right: 20, top: 30, bottom: 50 },
+    xAxis: {
+      type: 'category',
+      data: dates,
+      axisLabel: {
+        fontSize: 10,
+        interval: 0,
+        formatter: function(val, idx) {
+          return stageLabels[idx] || val;
+        }
+      },
+      axisLine: { lineStyle: { color: '#d0d0d0' } }
+    },
+    yAxis: {
+      type: 'value',
+      name: '题数',
+      minInterval: 1,
+      axisLabel: { fontSize: 11 },
+      splitLine: { lineStyle: { color: '#f0f0f0' } }
+    },
+    series: [{
+      type: 'bar',
+      data: counts.map(function(c, idx) {
+        return {
+          value: c,
+          itemStyle: {
+            color: c > 0 ? '#7b58df' : '#e5e7eb',
+            borderRadius: [4, 4, 0, 0]
+          }
+        };
+      }),
+      barWidth: '50%',
+      label: {
+        show: true,
+        position: 'top',
+        fontSize: 12,
+        fontWeight: 600,
+        color: '#6d28d9',
+        formatter: function(params) {
+          return params.value > 0 ? params.value : '';
+        }
+      },
+      markLine: {
+        silent: true,
+        symbol: 'none',
+        data: [{
+          yAxis: 0,
+          lineStyle: { color: '#d0d0d0', type: 'solid', width: 1 }
+        }]
+      }
+    }]
+  });
+
+  chart.off('click');
+  chart.on('click', function(params) {
+    if (params.componentType === 'series') {
+      var idx = params.dataIndex;
+      var dayDetail = stageDays[idx];
+      if (dayDetail && dayDetail.count > 0) {
+        selectDate(dayDetail.date, dayDetail);
+      }
+    }
+  });
+}
+
+function renderStages(days) {
+  var grid = document.getElementById('stages-grid');
+  grid.innerHTML = '';
+  var stageNames = ['第1阶段', '第2阶段', '第3阶段', '第4阶段', '第5阶段', '第6阶段'];
+  days.forEach(function(d, i) {
+    var cell = document.createElement('div');
+    cell.className = 'stage-cell';
+    cell.setAttribute('data-date', d.date);
+    cell.innerHTML =
+      '<div class="sc-day">' + stageNames[i] + '</div>' +
+      '<div class="sc-offset">D+' + d.dayOffset + '</div>' +
+      '<div class="sc-count">' + d.count + '</div>' +
+      '<div class="sc-unit">题</div>' +
+      '<div class="sc-day" style="margin-top:6px;">' + d.date.slice(5) + '</div>';
+    cell.onclick = function() {
+      selectDate(d.date, d);
+    };
+    grid.appendChild(cell);
+  });
+}
+
+function selectDate(dateStr, dayDetail) {
+  selectedDate = dateStr;
+  // 高亮阶段卡片
+  var cells = document.querySelectorAll('.stage-cell');
+  cells.forEach(function(c) {
+    if (c.getAttribute('data-date') === dateStr) {
+      c.classList.add('active');
+    } else {
+      c.classList.remove('active');
+    }
+  });
+  // 高亮曲线节点
+  if (chart) {
+    chart.dispatchAction({
+      type: 'showTip',
+      seriesIndex: 0,
+      name: dateStr
+    });
+  }
+  renderDetail(dayDetail);
+}
+
+function renderDetail(dayDetail) {
+  var titleEl = document.getElementById('detail-title');
+  var contentEl = document.getElementById('detail-content');
+
+  if (!dayDetail || dayDetail.count === 0) {
+    titleEl.textContent = '选中日期详情';
+    contentEl.innerHTML = '<div class="detail-empty">该日期无复习任务</div>';
+    return;
+  }
+
+  titleEl.textContent = dayDetail.date + ' · 到期 ' + dayDetail.count + ' 题';
+
+  var listHtml = '<div class="detail-list">';
+  var maxShow = Math.min(dayDetail.questions.length, 50);
+  for (var i = 0; i < maxShow; i++) {
+    var q = dayDetail.questions[i];
+    var stem = (q.stem || '').replace(/<[^>]+>/g, '').slice(0, 120);
+    var tagClass = q.source === 'local' ? 'local' : 'fenbi';
+    var tagText = q.source === 'local' ? '本地' : '粉笔';
+    listHtml +=
+      '<div class="detail-item">' +
+        '<div class="di-num">' + (i + 1) + '</div>' +
+        '<div class="di-stem">' + escapeHtml(stem) + '</div>' +
+        '<div class="di-tag ' + tagClass + '">' + tagText + '</div>' +
+      '</div>';
+  }
+  if (dayDetail.questions.length > 50) {
+    listHtml += '<div class="detail-item" style="justify-content:center;color:var(--ink-400);">共 ' + dayDetail.questions.length + ' 题，仅展示前 50 题</div>';
+  }
+  listHtml += '</div>';
+  contentEl.innerHTML = listHtml;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, function(c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+function applyPlan() {
+  if (!currentPlan || currentPlan.totalQuestions === 0) {
+    showToast('无未掌握题目，无需应用计划', 'error');
+    return;
+  }
+  var startDate = document.getElementById('start-date').value;
+  if (!confirm('确定应用此计划？将重排 ' + currentPlan.totalQuestions + ' 道题目的下次复习时间（起点 ' + startDate + '）。已复习阶段进度保留不变。')) {
+    return;
+  }
+
+  var btn = document.getElementById('apply-btn');
+  btn.disabled = true;
+  btn.textContent = '应用中...';
+
+  fetch('/api/quiz/review/apply-plan', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ startDate: startDate })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      btn.disabled = false;
+      btn.textContent = '应用此计划';
+      if (data.error) {
+        showToast(data.error, 'error');
+        return;
+      }
+      showToast('已重排 ' + data.applied + ' 道题目的复习时间', 'success');
+      setTimeout(function() {
+        window.location.href = '/wrong-questions';
+      }, 1500);
+    })
+    .catch(function(e) {
+      btn.disabled = false;
+      btn.textContent = '应用此计划';
+      showToast('应用失败: ' + e.message, 'error');
+    });
+}
+
+// 窗口 resize 时重绘图表
+window.addEventListener('resize', function() {
+  if (chart) chart.resize();
+});
+
+// 初始化：加载默认计划
+window.addEventListener('DOMContentLoaded', function() {
+  loadPlan();
+});
+</script>
+
+</body>
+</html>

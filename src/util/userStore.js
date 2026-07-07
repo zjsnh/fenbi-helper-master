@@ -21,6 +21,17 @@ const LEGACY_FILES = [
     { old: 'wrong_q_',            pattern: 'prefix' }   // wrong_q_<keypointId>.json
 ];
 
+// ── 按用户隔离的缓存 key（userId 变化时需迁移重命名） ──
+const USER_CACHE_KEYS = [
+    'exercise_history',
+    'quiz_records',
+    'wrong_q_local_quiz',
+    'word_frequency',
+    'wrong_keypoint_tree',
+    'wrong_review_state'
+];
+const USER_CACHE_PREFIX = 'wrong_q_'; // 前缀模式：wrong_q_<userId>_<keypointId>.json
+
 // ══════════════════════════════════════
 //  Cookie 中提取 userId
 // ══════════════════════════════════════
@@ -68,7 +79,71 @@ function readAdminPhones() {
 }
 
 // ══════════════════════════════════════
+//  userId 变化时迁移用户缓存文件
+//  将 cache 目录下所有 <key>_<oldUserId>.json 和 wrong_q_<oldUserId>_<keypointId>.json
+//  重命名为 <key>_<newUserId>.json / wrong_q_<newUserId>_<keypointId>.json
+// ══════════════════════════════════════
+function migrateUserCache(oldUserId, newUserId) {
+    if (!oldUserId || !newUserId || oldUserId === newUserId) {
+        return { moved: 0, skipped: 0, reason: 'same or empty userId' };
+    }
+
+    let moved = 0, skipped = 0;
+
+    // single 模式：<key>_<oldUserId>.json → <key>_<newUserId>.json
+    USER_CACHE_KEYS.forEach(key => {
+        const oldFile = path.join(CACHE_DIR, key + '_' + oldUserId + '.json');
+        const newFile = path.join(CACHE_DIR, key + '_' + newUserId + '.json');
+        if (!fs.existsSync(oldFile)) return;
+        if (fs.existsSync(newFile)) {
+            // 新文件已存在（用户已用新 userId 产生数据），跳过避免覆盖
+            skipped++;
+            return;
+        }
+        try {
+            fs.renameSync(oldFile, newFile);
+            moved++;
+        } catch (e) {
+            console.error('[MIGRATE-CACHE] 重命名失败 ' + path.basename(oldFile) + ':', e.message);
+            skipped++;
+        }
+    });
+
+    // prefix 模式：wrong_q_<oldUserId>_<keypointId>.json → wrong_q_<newUserId>_<keypointId>.json
+    const oldPrefix = USER_CACHE_PREFIX + oldUserId + '_';
+    const newPrefix = USER_CACHE_PREFIX + newUserId + '_';
+    let files = [];
+    try {
+        files = fs.readdirSync(CACHE_DIR);
+    } catch (e) {
+        files = [];
+    }
+    files.forEach(f => {
+        if (!f.startsWith(oldPrefix) || !f.endsWith('.json')) return;
+        if (f.endsWith('.bak')) return;
+        const suffix = f.slice(oldPrefix.length); // <keypointId>.json
+        const oldFile = path.join(CACHE_DIR, f);
+        const newFile = path.join(CACHE_DIR, newPrefix + suffix);
+        if (fs.existsSync(newFile)) {
+            skipped++;
+            return;
+        }
+        try {
+            fs.renameSync(oldFile, newFile);
+            moved++;
+        } catch (e) {
+            console.error('[MIGRATE-CACHE] 重命名失败 ' + f + ':', e.message);
+            skipped++;
+        }
+    });
+
+    console.log('[MIGRATE-CACHE] ' + oldUserId + ' → ' + newUserId + ': 迁移 ' + moved + ' 个, 跳过 ' + skipped + ' 个');
+    return { moved, skipped };
+}
+
+// ══════════════════════════════════════
 //  创建/更新用户记录（登录时调用）
+//  关联策略：优先按完整手机号（phoneRaw）关联，userId 变化时自动迁移缓存
 // ══════════════════════════════════════
 function upsertUser(userId, phone) {
     if (!userId) return null;
@@ -76,34 +151,59 @@ function upsertUser(userId, phone) {
     const adminPhones = readAdminPhones();
     const now = Date.now();
     const maskedPhone = maskPhone(phone);
+    const rawPhone = phone ? String(phone).trim() : '';
 
     // 判断角色
-    const isAdminPhone = phone && adminPhones.includes(phone);
+    const isAdminPhone = rawPhone && adminPhones.includes(rawPhone);
     let role = isAdminPhone ? 'admin' : 'user';
 
+    // 1. 优先按完整手机号关联（phone 非空时）
+    //    同一手机号即使粉笔下发了新 userId，也能关联到旧用户记录与缓存数据
+    if (rawPhone) {
+        const byPhone = (data.users || []).find(u => u.phoneRaw === rawPhone);
+        if (byPhone) {
+            // userId 变化：迁移旧 userId 的缓存文件到新 userId
+            if (byPhone.userId !== userId) {
+                console.log('[USER] userId 变化: ' + byPhone.userId + ' → ' + userId + ' (phone=' + maskedPhone + ')');
+                migrateUserCache(byPhone.userId, userId);
+                byPhone.userId = userId;
+            }
+            byPhone.phone = maskedPhone;
+            byPhone.phoneRaw = rawPhone;
+            byPhone.lastLoginAt = now;
+            if (isAdminPhone) byPhone.role = 'admin';
+            writeUsers(data);
+            return byPhone;
+        }
+    }
+
+    // 2. 按 userId 查找（兼容旧数据或 phone 为空的情况）
     const existing = (data.users || []).find(u => u.userId === userId);
     if (existing) {
         existing.phone = maskedPhone;
+        if (rawPhone) existing.phoneRaw = rawPhone;
         existing.lastLoginAt = now;
-        // 已存在的用户：若手机号匹配 adminPhones，自动升级为 admin
         if (isAdminPhone) existing.role = 'admin';
-        // 不主动降级（避免管理员手机号配置临时为空时丢失权限）
-    } else {
-        // 首次注册：若 admins.json 不存在或为空，首个用户成为 admin（兜底）
-        if (!fs.existsSync(ADMINS_FILE) || adminPhones.length === 0) {
-            const userCount = (data.users || []).length;
-            if (userCount === 0) role = 'admin';
-        }
-        (data.users = data.users || []).push({
-            userId,
-            phone: maskedPhone,
-            role,
-            createdAt: now,
-            lastLoginAt: now
-        });
+        writeUsers(data);
+        return existing;
     }
+
+    // 3. 新建用户
+    if (!fs.existsSync(ADMINS_FILE) || adminPhones.length === 0) {
+        const userCount = (data.users || []).length;
+        if (userCount === 0) role = 'admin';
+    }
+    const newUser = {
+        userId,
+        phone: maskedPhone,
+        phoneRaw: rawPhone,
+        role,
+        createdAt: now,
+        lastLoginAt: now
+    };
+    (data.users = data.users || []).push(newUser);
     writeUsers(data);
-    return existing || (data.users || []).find(u => u.userId === userId);
+    return newUser;
 }
 
 // ══════════════════════════════════════

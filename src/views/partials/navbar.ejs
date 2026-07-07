@@ -1,0 +1,33 @@
+<div class="navbar">
+  <a href="/history-category-complex" class="logo"><img src="/logo.svg" alt="">错题助手</a>
+  <a href="/history-category-complex"<%- typeof activePage !== 'undefined' && activePage === 'history-category-complex' ? ' class="active"' : '' %>>练习总览</a>
+  <a href="/history"<%- typeof activePage !== 'undefined' && activePage === 'history' ? ' class="active"' : '' %>>每日记录</a>
+  <a href="/wrong-questions"<%- typeof activePage !== 'undefined' && activePage === 'wrong-questions' ? ' class="active"' : '' %>>错题复习</a>
+  <a href="/quiz"<%- typeof activePage !== 'undefined' && activePage === 'quiz' ? ' class="active"' : '' %>>题库刷题</a>
+  <a href="/word-frequency"<%- typeof activePage !== 'undefined' && activePage === 'word-frequency' ? ' class="active"' : '' %>>词频分析</a>
+  <a href="/word-stats"<%- typeof activePage !== 'undefined' && activePage === 'word-stats' ? ' class="active"' : '' %>>高频词语</a>
+  <a href="/idioms"<%- typeof activePage !== 'undefined' && activePage === 'idioms' ? ' class="active"' : '' %>>成语词典</a>
+  <div class="nav-dropdown">
+    <span class="dropdown-toggle">工具 &#x25BE;</span>
+    <div class="dropdown-menu">
+      <a href="/shenlun-format"<%- typeof activePage !== 'undefined' && activePage === 'shenlun-format' ? ' class="active"' : '' %>>公文速查</a>
+      <a href="/calc"<%- typeof activePage !== 'undefined' && activePage === 'calc' ? ' class="active"' : '' %>>速算练习</a>
+    </div>
+  </div>
+  <% if (typeof userPhone !== 'undefined' && userPhone) { %><span class="nav-user"><span class="user-phone"><%= userPhone %></span><% if (typeof isAdmin !== 'undefined' && isAdmin) { %><span class="admin-badge">管理员<span class="admin-tooltip"><span class="tip-title">👑 管理员权限</span><span class="tip-item">卸载题库</span><span class="tip-item">恢复题库</span><span class="tip-item">查看回收站</span></span></span><% } %></span><% } else { %><span style="margin-left:auto;"></span><% } %>
+  <a href="/setup">切换账号</a>
+  <span id="deviceBadge" style="font-size:10px;color:var(--ink-400);padding:3px 8px;border:0.5px solid var(--g-200);border-radius:6px;font-family:var(--font-mono, monospace);" title="当前设备指纹">设备 -</span>
+</div>
+<script>
+  (function () {
+    function show() {
+      var id = window.__DEVICE_ID__ || (window.getDeviceId && window.getDeviceId());
+      if (id) {
+        var el = document.getElementById('deviceBadge');
+        if (el) el.textContent = '设备 ' + id.slice(0, 8);
+      }
+    }
+    if (window.__DEVICE_ID__) show();
+    else document.addEventListener('DOMContentLoaded', function () { setTimeout(show, 100); });
+  })();
+</script>

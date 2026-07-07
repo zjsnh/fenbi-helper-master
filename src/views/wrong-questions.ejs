@@ -645,21 +645,187 @@
       margin-right: 6px;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── 艾宾浩斯每日复习卡片 ── */
+    .review-card {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      background:
+        radial-gradient(ellipse at 0% 50%, rgba(124,58,237,0.06) 0%, transparent 60%),
+        linear-gradient(135deg, var(--card) 0%, rgba(124,58,237,0.03) 100%);
+      border: 0.5px solid rgba(124,58,237,0.18);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      animation: statPop 0.4s var(--ease-out) both;
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.3s var(--ease-out);
+    }
+    .review-card:hover {
+      box-shadow: 0 4px 16px rgba(124,58,237,0.15);
+      border-color: rgba(124,58,237,0.35);
+      transform: translateY(-1px);
+    }
+    .review-card .plan-hint {
+      position: absolute;
+      top: 12px;
+      right: 16px;
+      font-size: 11px;
+      color: #7c3aed;
+      opacity: 0.7;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.25s;
+    }
+    .review-card:hover .plan-hint {
+      opacity: 1;
+      transform: translateX(2px);
+    }
+    .review-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; bottom: 0;
+      width: 3px;
+      background: linear-gradient(180deg, #7c3aed 0%, #a855f7 100%);
+    }
+    .review-card.review-empty {
+      background: var(--card);
+      border-color: var(--text-100);
+    }
+    .review-card.review-empty::before { background: var(--text-200); }
+    .review-main {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .review-main .num {
+      font-size: 36px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      color: #7c3aed;
+      line-height: 1;
+      letter-spacing: -1px;
+    }
+    .review-card.review-empty .num { color: var(--text-400); }
+    .review-main .lbl {
+      font-size: 13px;
+      color: var(--ink-500);
+      font-weight: 500;
+    }
+    .review-stages {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+    .review-stages .stage-title {
+      font-size: 11px;
+      color: var(--ink-400);
+      letter-spacing: 0.5px;
+    }
+    .review-stages .stage-bars {
+      display: flex;
+      gap: 4px;
+      align-items: flex-end;
+      height: 32px;
+    }
+    .review-stages .stage-bar {
+      flex: 1;
+      background: rgba(124,58,237,0.08);
+      border-radius: 3px 3px 0 0;
+      position: relative;
+      min-height: 4px;
+      transition: height var(--dur-normal) var(--ease-out);
+    }
+    .review-stages .stage-bar.active {
+      background: linear-gradient(180deg, #a855f7 0%, #7c3aed 100%);
+    }
+    .review-stages .stage-labels {
+      display: flex;
+      gap: 4px;
+      font-size: 10px;
+      color: var(--ink-400);
+    }
+    .review-stages .stage-label {
+      flex: 1;
+      text-align: center;
+    }
+    .review-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+    .review-meta .mastered {
+      font-size: 14px;
+      color: var(--g-600);
+      font-weight: 600;
+    }
+    .review-meta .mastered-lbl {
+      font-size: 11px;
+      color: var(--ink-400);
+    }
+    .review-btn {
+      flex-shrink: 0;
+      padding: 10px 20px;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--dur-normal) var(--ease-out);
+      font-family: inherit;
+    }
+    .review-btn-due {
+      background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+      box-shadow: 0 2px 8px rgba(124,58,237,0.25);
+    }
+    .review-btn-due:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(124,58,237,0.35);
+    }
+    .review-btn-all {
+      background: var(--card);
+      color: #7c3aed;
+      border: 1px solid #d8b4fe;
+    }
+    .review-btn-all:hover:not(:disabled) {
+      background: #f3e8ff;
+      transform: translateY(-1px);
+    }
+    .review-btn:disabled {
+      background: var(--text-200);
+      color: var(--text-400);
+      cursor: not-allowed;
+      box-shadow: none;
+      border-color: var(--text-200);
+      transform: none;
+    }
+    .review-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    @media (max-width: 768px) {
+      .review-card { flex-wrap: wrap; gap: 16px; }
+      .review-stages { width: 100%; order: 3; }
+      .review-meta { order: 2; }
+    }
   </style>
 </head>
 <body>
 
-<div class="navbar">
-  <a href="/history-category-complex" class="logo"><img src="/logo.svg" alt="">错题助手</a>
-  <a href="/history-category-complex">练习记录</a>
-  <a href="/history">列表视图</a>
-  <a href="/wrong-questions" class="active">错题本</a>
-  <a href="/word-frequency">词语统计</a>
-  <a href="/quiz">本地题库</a>
-  <a href="/shenlun-format">公文格式</a>
-  <% if (typeof userPhone !== 'undefined' && userPhone) { %><span class="nav-user"><span class="user-phone"><%= userPhone %></span><% if (typeof isAdmin !== 'undefined' && isAdmin) { %><span class="admin-badge">管理员<span class="admin-tooltip"><span class="tip-title">👑 管理员权限</span><span class="tip-item">卸载题库</span><span class="tip-item">恢复题库</span><span class="tip-item">查看回收站</span></span></span><% } %></span><% } else { %><span style="margin-left:auto;"></span><% } %>
-  <a href="/setup">切换账号</a>
-</div>
+<%- include('./partials/navbar.ejs', { activePage: 'wrong-questions' }) %>
 
 <div class="container-wide">
   <!-- 页面头部 -->
@@ -693,6 +859,40 @@
   </div>
 
   <!-- 分类网格主容器 -->
+  <div class="review-card review-empty" id="review-card" style="display:none;" onclick="goReviewPlan()">
+    <div class="review-main">
+      <span class="num" id="review-due-count">0</span>
+      <span class="lbl" id="review-due-label">今日待复习</span>
+    </div>
+    <div class="review-stages">
+      <div class="stage-title">复习阶段分布（1天 · 2天 · 4天 · 7天 · 15天 · 30天） · 队列 <span id="review-total-count">0</span> 题</div>
+      <div class="stage-bars" id="review-stage-bars">
+        <div class="stage-bar" style="height:4px;"></div>
+        <div class="stage-bar" style="height:4px;"></div>
+        <div class="stage-bar" style="height:4px;"></div>
+        <div class="stage-bar" style="height:4px;"></div>
+        <div class="stage-bar" style="height:4px;"></div>
+        <div class="stage-bar" style="height:4px;"></div>
+      </div>
+      <div class="stage-labels">
+        <span class="stage-label">1d</span>
+        <span class="stage-label">2d</span>
+        <span class="stage-label">4d</span>
+        <span class="stage-label">7d</span>
+        <span class="stage-label">15d</span>
+        <span class="stage-label">30d</span>
+      </div>
+    </div>
+    <div class="review-meta">
+      <span class="mastered" id="review-mastered">0</span>
+      <span class="mastered-lbl">已掌握</span>
+    </div>
+    <div class="review-btns">
+      <button class="review-btn review-btn-due" id="review-start-btn" disabled onclick="event.stopPropagation(); startReview('due')">复习到期</button>
+      <button class="review-btn review-btn-all" id="review-all-btn" disabled onclick="event.stopPropagation(); startReview('all')">立即复习全部</button>
+    </div>
+  </div>
+
   <div class="breadcrumb" id="breadcrumb">
     <span class="crumb current">全部分类</span>
   </div>
@@ -708,6 +908,117 @@
   var currentPath = [];
 
   renderCategories(CATEGORIES, []);
+
+  // ── 艾宾浩斯每日复习 ──
+  // 若后端已返回 reviewStats，直接渲染；否则异步拉取
+  var REVIEW_STATS = <% if (typeof reviewStats !== 'undefined' && reviewStats) { %><%- JSON.stringify(reviewStats) %><% } else { %>null<% } %>;
+  if (REVIEW_STATS) {
+    renderReviewCard(REVIEW_STATS);
+  } else {
+    loadReviewStats();
+  }
+
+  function loadReviewStats() {
+    fetch('/api/quiz/review/today')
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(data) {
+        if (data && data.stats) renderReviewCard(data.stats);
+      })
+      .catch(function(e) { console.warn('复习数据加载失败:', e); });
+  }
+
+  function renderReviewCard(stats) {
+    var card = document.getElementById('review-card');
+    if (!card) return;
+    var dueCount = stats.dueToday || 0;
+    var totalCount = stats.total || 0;
+    var mastered = stats.mastered || 0;
+
+    // 空队列也显示卡片（作为复习规划入口），仅按钮置灰
+    card.style.display = 'flex';
+
+    document.getElementById('review-due-count').textContent = dueCount;
+    document.getElementById('review-total-count').textContent = totalCount;
+    document.getElementById('review-mastered').textContent = mastered;
+
+    // 标签文案：有到期题时「今日待复习」，无到期但有队列时「队列总数」，全空时「待入队」
+    var lbl = document.getElementById('review-due-label');
+    if (dueCount > 0) {
+      lbl.textContent = '今日待复习';
+    } else if (totalCount > 0) {
+      lbl.textContent = '队列总数';
+    } else {
+      lbl.textContent = '待入队';
+    }
+
+    // 渲染阶段分布条
+    var bars = document.querySelectorAll('#review-stage-bars .stage-bar');
+    var stageDist = stats.stageDist || [0, 0, 0, 0, 0, 0];
+    var maxCount = Math.max.apply(null, stageDist.concat([1]));
+    stageDist.forEach(function(count, i) {
+      if (bars[i]) {
+        var h = count > 0 ? Math.max(4, (count / maxCount) * 32) : 4;
+        bars[i].style.height = h + 'px';
+        bars[i].className = 'stage-bar' + (count > 0 ? ' active' : '');
+        bars[i].title = '阶段 ' + (i + 1) + '：' + count + ' 题';
+      }
+    });
+
+    // 「复习到期」按钮
+    var dueBtn = document.getElementById('review-start-btn');
+    dueBtn.disabled = dueCount === 0;
+    dueBtn.textContent = dueCount > 0 ? '复习到期 ' + dueCount + ' 题' : '暂无到期';
+
+    // 「立即复习全部」按钮
+    var allBtn = document.getElementById('review-all-btn');
+    allBtn.disabled = totalCount === 0;
+    allBtn.textContent = totalCount > 0 ? '立即复习全部 ' + totalCount + ' 题' : '队列为空';
+
+    // 空状态样式（无到期时加 empty 样式，仍保留卡片可点击跳转）
+    if (dueCount === 0) {
+      card.classList.add('review-empty');
+    } else {
+      card.classList.remove('review-empty');
+    }
+  }
+
+  function goReviewPlan() {
+    window.location.href = '/review-plan';
+  }
+
+  function startReview(mode) {
+    var btnId = mode === 'all' ? 'review-all-btn' : 'review-start-btn';
+    var btn = document.getElementById(btnId);
+    if (btn.disabled) return;
+    var msg = mode === 'all'
+      ? '立即复习队列中全部未掌握题目？答对进入下一复习阶段，答错重置到第 1 阶段。'
+      : '开始今日到期题目复习？答对进入下一复习阶段，答错重置到第 1 阶段。';
+    if (!confirm(msg)) return;
+    var originHTML = btn.innerHTML;
+    btn.disabled = true;
+    btn.textContent = '加载中...';
+    fetch('/api/quiz/review/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: mode })
+    })
+      .then(function(r) {
+        if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || '构建失败'); });
+        return r.json();
+      })
+      .then(function(data) {
+        if (data.setId) {
+          window.location.href = '/quiz/' + data.setId + '?from=/wrong-questions';
+        } else {
+          throw new Error('未返回题集 ID');
+        }
+      })
+      .catch(function(e) {
+        alert('复习启动失败：' + e.message);
+        btn.disabled = false;
+        btn.innerHTML = originHTML;
+      });
+  }
 
   function renderCategories(nodes, path) {
     currentNodeList = nodes;

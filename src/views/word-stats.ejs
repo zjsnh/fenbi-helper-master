@@ -301,23 +301,7 @@
   </style>
 </head>
 <body>
-<div class="navbar">
-  <a href="/history-category-complex" class="logo"><img src="/logo.svg" alt="">错题助手</a>
-  <a href="/history-category-complex">练习记录</a>
-  <a href="/history">列表视图</a>
-  <a href="/wrong-questions">错题本</a>
-  <div class="nav-dropdown open">
-    <span class="dropdown-toggle">词语统计 &#x25BE;</span>
-    <div class="dropdown-menu">
-      <a href="/idioms">四字成语</a>
-      <a href="/word-stats" class="active">高频词语</a>
-    </div>
-  </div>
-  <a href="/quiz">本地题库</a>
-  <a href="/shenlun-format">公文格式</a>
-  <% if (typeof userPhone !== 'undefined' && userPhone) { %><span class="nav-user"><span class="user-phone"><%= userPhone %></span><% if (typeof isAdmin !== 'undefined' && isAdmin) { %><span class="admin-badge">管理员<span class="admin-tooltip"><span class="tip-title">👑 管理员权限</span><span class="tip-item">卸载题库</span><span class="tip-item">恢复题库</span><span class="tip-item">查看回收站</span></span></span><% } %></span><% } else { %><span style="margin-left:auto;"></span><% } %>
-  <a href="/setup">切换账号</a>
-</div>
+<%- include('./partials/navbar.ejs', { activePage: 'word-stats' }) %>
 
 <div class="page-wrap">
   <div class="page-header">
