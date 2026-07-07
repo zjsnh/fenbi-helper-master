@@ -619,6 +619,14 @@ function goNext() {
   else { openSubmitDialog(); }
 }
 
+// 方向键左右切换题目（焦点在输入框/文本域时不触发，避免与输入冲突）
+document.addEventListener('keydown', function(e) {
+  var tag = (e.target && e.target.tagName) || '';
+  if (/^(INPUT|TEXTAREA|SELECT)$/i.test(tag)) return;
+  if (e.key === 'ArrowLeft')      { e.preventDefault(); goPrev(); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); goNext(); }
+});
+
 function updateNav() {
   document.getElementById('prevBtn').disabled = (curIdx === 0);
   var nextBtn = document.getElementById('nextBtn');

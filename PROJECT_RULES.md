@@ -31,6 +31,7 @@
 - 本地题库加载：`src/util/quizLoader.js`（xlsx/apkg → 内存）
 - 视图目录：`src/views/*.ejs`（cache: false）
 - 上传题库：`uploaded-quizzes/`（已 gitignore，配置持久化到 config.json）
+- 回收站：`.deleted-quizzes/`（已 gitignore，软删除题库暂存目录，2 天保留期，trash.json 记录元数据）
 - 缓存目录：`cache/`（已 gitignore，含敏感数据）
 
 ## 已知偏好（用户级）
@@ -40,6 +41,13 @@
 - UI/UX：偏好视觉重构，不满意现有设计
 
 ## 最近变更
+- 2026-07-07：题库软删除/回收站机制——卸载题库不再直接删除文件，改为移动到 `.deleted-quizzes/` 目录并记录元数据到 `trash.json`，保留 2 天可恢复；quizLoader.js 新增 `moveToTrash(folderName)` / `restoreFromTrash(folderName)` / `listTrash()` / `cleanupTrash()` 四个函数，`loadAll()` 启动时调用 `cleanupTrash()` 永久删除超期项；app.js `/api/quiz/uninstall` 路由从永久删除改为 `moveToTrash()`，新增 `GET /api/quiz/trash`（列出可恢复题库）和 `POST /api/quiz/restore`（恢复题库）路由；quiz-list.ejs 分类页底部新增可折叠「回收站」区域（`loadTrash()` 拉取列表，每项显示题库名、删除时间、剩余恢复小时数，`restoreQuiz()` 调用恢复接口），`uninstallQuiz()` 确认提示更新为「移入回收站，2 天内可恢复，超期永久删除」；`.gitignore` 新增 `.deleted-quizzes/`
+- 2026-07-07：设备指纹识别——新增 `src/views/js/device.js`，收集 Canvas 指纹（toDataURL hash）+ WebGL 指纹（UNMASKED_VENDOR/RENDERER）+ UA/屏幕/时区等 10 项特征，FNV-1a 双重 hash 输出 16 位 hex 存入 localStorage + 10 年 cookie；重写 `XMLHttpRequest.prototype.open/send` 和 `window.fetch` 自动注入 `X-Device-Id` header；app.js 新增 HTML 自动注入中间件（在 `</body>` 前注入 `<script src="/js/device.js">`，仅注入一次）+ 设备识别中间件（优先读 header 回退 cookie，注入 `ctx.deviceId`/`ctx.state.deviceId`，访问日志含 deviceId）；history-category-complex.ejs navbar 新增 `#deviceBadge` 显示指纹前 8 位
+- 2026-07-06：项目不再内置题库——`QUIZ_DIRS` 改为空数组，移除片段阅读600题、花生逻辑推理600题、红领巾言语理解600题三个内置配置；所有题库均通过上传功能（`/api/quiz/upload-folder`）添加，配置持久化到 `uploaded-quizzes/config.json`；启动时自动清理目录不存在的动态配置（`loadAll` 中校验 `fs.existsSync`，失效项从 config.json 移除并打印日志）；新增 `start.bat` 启动脚本（自动检查 Node.js、首次运行 `npm install`、显示本机与局域网访问地址）
+- 2026-07-06：app.js 服务监听改为 `0.0.0.0:3000` 支持局域网访问（平板/手机同 WiFi 可访问），启动时自动打印本机与局域网 IP；需配合 Windows 防火墙入站规则放行 3000 端口（`New-NetFirewallRule -DisplayName "fenbi-helper-3000" -Direction Inbound -Protocol TCP -LocalPort 3000 -Action Allow -Profile Private`）
+- 2026-07-06：词语统计/词语频次/公文格式三个页面卡片展开动画优化——弹窗面板从 `display:none→block` 改为 `opacity+visibility` 过渡，修复再次打开时动画不触发的问题；遮罩层 0.25s 淡入，内容面板 `scale(0.92)+translateY(20px) → scale(1)+translateY(0)` 0.4s 弹簧曲线；三个页面卡片 hover 增强：上浮 3-4px + 蓝色边框 + 蓝色阴影，active 回落，限定 `.visible` 类避免与入场动画冲突
+- 2026-07-06：quiz-play.ejs 新增方向键左右切换题目——监听 `keydown` 事件，`ArrowLeft` 调用 `goPrev()`，`ArrowRight` 调用 `goNext()`（末题时打开提交确认弹窗）；焦点在 `INPUT`/`TEXTAREA`/`SELECT` 时跳过，避免与输入冲突
+- 2026-07-06：quiz-list.ejs 上传弹窗格式规范新增「三、md 题库规范」章节（原「三、文件与文件夹」顺延为「四」）——含 `## 填空题/解答题/选择题` 二级标题、`### 第 X 题` 三级标题、`**考点**/**题目**/**答案**/**解析**` 四个加粗字段、`---` 分隔线共 7 个元素说明；底部说明 md 题库用于无选项题型，做题页「显示答案」按钮交互、跳过判分、结果页「已查看」徽章；文件夹选择按钮提示文字更新为「含 xlsx / apkg / md」
 - 2026-07-06：无选项题（填空/解答题）答题界面支持——quizLoader.js 新增 `parseMdFile(filePath, source)` 解析 Markdown 题库（`### 第 X 题` 拆题 + `**考点**/**题目**/**答案**/**解析**` 字段提取，`## 填空题/解答题/选择题` 二级标题切换题型，自动剥离「（本题满分 X 分）」前缀），`loadDir` 新增 md 分支；app.js `/api/quiz/upload-folder` 路由支持 `.md` 文件（按数量多数原则检测主扩展名），`/quiz/:setId/submit` 提交判分逻辑中无选项题（`options.length === 0`）跳过判分，`correct = null` 不计入对错与未答统计；quiz-play.ejs `renderQuestion()` 检测 `isNoOpt`，无选项题渲染「▸ 显示答案」按钮 + 答案/解析面板（默认隐藏），新增 `toggleAnswer(qNo)` 函数控制展开/收起 + KaTeX 公式补渲染，`updateStatus()` / `renderDots()` / `openSubmitDialog()` 仅统计有选项题，导航点无选项题用 `.no-opt` 淡紫色独立样式；quiz-result.ejs 无选项题状态显示「已查看」紫色徽章（`.status-viewed` + `.q-item.viewed`），答案行改为「参考答案：xxx」不显示「我的答案」；quiz-list.ejs 前端文件选择器支持 `.md` 文件，状态文本显示 `xlsx X / apkg Y / md Z`
 - 2026-07-06：列表视图新增「重做当日错题」功能——后端新增 `POST /api/quiz/redo` 路由，调用 `getDailyWrongStats(date, cookie, exerciseIds)` 获取错题（复用错题导出过滤参数 `exerciseIds`），转换为 quiz-play 格式（`normAnswer` 提取字母、`stripHtml` 去选项 HTML 标签），通过 `quizLoader.registerCustomSet(customId, source, setName, questions)` 注册为 `custom_redo_<date>_<timestamp>` 内存题集，前端跳转 `/quiz/<setId>` 进入做题页；history.ejs 每日分组新增「重做当日错题」按钮（蓝色品牌色，与「导出当日错题」并列），复选框选择时按钮切换为「重做所选错题 N」高亮态；`onExerciseSelect` 同时更新导出与重做两个按钮状态
 - 2026-07-06：列表视图当日错题导出支持按练习勾选——history.ejs 每个练习行新增 `<input type="checkbox" class="ex-cb">`（`data-date`/`data-id`），点击复选框 `event.stopPropagation()` 避免触发行跳转；未勾选时「导出当日错题」按钮走原逻辑（导出当日全部），勾选 N 个时按钮变高亮态显示「导出所选错题 N」，仅导出所选练习错题；`getDailyWrongStats` 新增第三参数 `exerciseIds`（可选数组，提供时按 ID 过滤当天练习）；`/api/export-daily-wrong-pdf` 改为 `Content-Disposition: attachment` 下载方式（沿用 `/api/quiz/export-pdf` 路径），文件名 `日期-当日错题.pdf` 或 `日期-错题(所选N个练习).pdf`

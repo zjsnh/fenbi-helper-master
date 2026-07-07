@@ -64,11 +64,11 @@
 - 顶部格式要素说明卡，统一讲解标题、主送机关、正文、落款书写规范
 
 ### 本地题库刷题
-- 内置 **2 个题库共 1036 道题**：片段阅读 436 题（22 套）+ 花生逻辑推理 600 题（30 套）
-- 题库以 xlsx 文件存储于项目根目录，启动时由 `quizLoader.js` 加载到内存
+- **无内置题库**：项目不预置任何题库，所有题库均通过上传功能添加（xlsx / apkg / md），配置持久化到 `uploaded-quizzes/config.json`；启动时自动清理目录不存在的失效配置
 - **做题页**：单题展示、选项点击作答（支持 4/6 选项）、顶部进度条、总计时器、上一题/下一题/题号导航点
 - **多选题支持**：题型识别正则 `/多(选|项)/` 兼容"多选"、"多项选择"等变体；多选题作答不自动跳转，需手动点击下一题；判分时答案字母去重排序后比较
 - **标记疑题**：每题可标记为疑题，提交时单独统计
+- **键盘快捷键**：做题页支持方向键 `←` 上一题、`→` 下一题（末题时打开提交确认弹窗）；焦点在输入框/文本域时跳过，避免与输入冲突
 - **自动判分**：提交后后端对照答案统计对错，生成练习记录
 - **结果页**：正确率/答对/答错/未答/疑题统计卡、题目列表（对错高亮+疑题标记）、解析展开（压缩空白避免大量空行）、PDF 导出
 - **同步练习记录**：做题记录自动写入 `exercise_history.json`，在列表视图和分类聚合页显示"本地题库"标签；列表视图标题显示为「一级题库名 + 题目数量」（如"【1】片段阅读600题题库 · 50题"），旧缓存通过 recordId 三级回填 source
@@ -84,7 +84,9 @@
 - **上传题库**：题库列表页右上角「+ 上传题库」按钮，选择文件夹即可批量上传 xlsx / apkg / md 文件
 - **保留原始文件夹名**：上传时以原始文件夹名作为磁盘存储目录名，不自动重命名、不加时间戳
 - **动态加载**：上传后自动加载到题库列表，无需重启服务；配置持久化到 `uploaded-quizzes/config.json`
-- **卸载题库**：分类卡片 hover 显示「✕」卸载按钮，仅对上传题库生效，内置题库不可卸载
+- **软删除/回收站**：卸载题库不再直接删除，而是移动到 `.deleted-quizzes/` 暂存 2 天，期间可在题库列表页底部「回收站」区域查看并恢复；超过 2 天自动永久删除（启动时执行清理）；回收站每项显示题库名、删除时间、剩余恢复小时数
+- **卸载题库**：分类卡片 hover 显示「✕」卸载按钮，移入回收站（2 天可恢复）；手动删除文件夹后，下次启动服务时自动清理失效配置
+- **启动脚本**：双击 `start.bat` 即可启动（自动检查 Node.js、首次运行 `npm install`、显示本机与局域网访问地址）
 - **格式规范弹窗**：上传弹窗含详细 xlsx 表头规范（题干/选项A~F/答案/题型/解析/知识点/图片URL/题号）、apkg 字段规范（7 字段顺序固定 + `\x1f` 分隔 + `<br>` 选项格式）、md 题库规范（`### 第 X 题` 拆题 + `**考点**/**题目**/**答案**/**解析**` 字段 + `## 填空题/解答题/选择题` 二级标题切换题型）
 - **标准题库生成 Skill**：项目内置 `.trae/skills/standard-quiz-builder/SKILL.md`，可在 TRAE IDE 中调用生成符合规范的 xlsx/apkg 题库
 
@@ -146,9 +148,7 @@ fenbi-helper-master/
 ├── fonts/                         # PDF 中文字体
 ├── fenbi-helper-design/          # 设计稿
 ├── cache/                        # 本地缓存（已 gitignore，含敏感数据）
-├── uploaded-quizzes/            # 上传的题库文件夹（已 gitignore，运行时生成）
-├── 【1】片段阅读600题题库/         # 片段阅读题库（22 套 xlsx，436 题）
-├── 【5】花生逻辑推理600题题库/     # 逻辑推理题库（30 套 xlsx，600 题）
+├── uploaded-quizzes/            # 上传的题库文件夹（已 gitignore，运行时生成，所有题库均通过上传添加）
 ├── 言语成语表_结构化.csv           # 成语词典数据源（598 条）
 ├── .trae/skills/standard-quiz-builder/  # 标准题库生成 Skill（TRAE IDE）
 ├── Dockerfile
@@ -163,6 +163,12 @@ fenbi-helper-master/
 
 ### 启动步骤
 
+**方式一：启动脚本（推荐）**
+
+双击项目根目录的 `start.bat`，脚本会自动检查 Node.js、首次运行 `npm install`、启动服务并打印本机与局域网访问地址。
+
+**方式二：命令行**
+
 ```bash
 # 安装依赖
 npm install
@@ -171,7 +177,7 @@ npm install
 node src/app.js
 ```
 
-服务默认监听 `http://localhost:3000`。
+服务默认监听 `http://localhost:3000`，同时绑定 `0.0.0.0` 支持局域网访问。
 
 ### 首次使用
 1. 打开 http://localhost:3000 ，未登录会自动跳转到登录页
@@ -197,7 +203,9 @@ node src/app.js
 | `/api/wrong-questions/pdf` | 导出错题本 PDF |
 | `/api/exercises/export-pdf` | 按练习记录批量导出错题/未写题目 PDF |
 | `/api/quiz/upload-folder` | 上传题库文件夹（xlsx/apkg/md，保留原始文件夹名） |
-| `/api/quiz/uninstall` | 卸载上传的题库（删除磁盘文件 + 移除配置） |
+| `/api/quiz/uninstall` | 卸载上传的题库（移入回收站，2 天可恢复） |
+| `/api/quiz/trash` | 列出回收站中可恢复的题库（含剩余恢复时间） |
+| `/api/quiz/restore` | 从回收站恢复题库（移回 uploaded-quizzes/ + 恢复配置） |
 | `/api/quiz/export-pdf` | 本地题库结果导出 PDF（错题+疑题） |
 | `/api/quiz/export-set-pdf` | 本地题库题套导出 PDF（按 setId 导出整套题，支持范围与隐藏答案） |
 | `/api/export-daily-wrong-pdf` | 按日期导出当日错题 PDF（含词语统计页，支持 `exerciseIds` 按练习过滤，`attachment` 下载方式） |
@@ -218,6 +226,10 @@ node src/app.js
 
 ## 工程约定
 
+- **无内置题库**：`QUIZ_DIRS` 为空数组，项目不预置任何题库；所有题库均通过上传功能（`/api/quiz/upload-folder`）添加，配置持久化到 `uploaded-quizzes/config.json`
+- **失效配置自动清理**：服务启动 `loadAll()` 时校验每个动态配置的目录是否存在（`fs.existsSync`），目录不存在的配置从 config.json 移除并打印日志，避免手动删除文件夹后失效配置残留
+- **题库软删除/回收站**：卸载题库时文件夹移动到 `.deleted-quizzes/`（已 gitignore），元数据写入 `trash.json`，保留 2 天可恢复（`POST /api/quiz/restore`）；`loadAll()` 启动时调用 `cleanupTrash()` 永久删除超期项；quiz-list.ejs 分类页底部「回收站」区域可折叠查看并恢复
+- **设备指纹识别**：`src/views/js/device.js` 生成浏览器指纹（Canvas + WebGL + UA 等特征 FNV-1a hash → 16 位 hex），存入 localStorage + 10 年 cookie；XHR/fetch 自动注入 `X-Device-Id` header；app.js HTML 自动注入中间件在 `</body>` 前注入该脚本，设备识别中间件注入 `ctx.deviceId`
 - 练习记录数据获取采用 **cursor 游标分页**，全量拉取后按 id 去重
 - 三个 categoryId 并发拉取：`1=模考/真题`、`2=每日演练`、`3=专项智能练习`
 - 词语统计区分成语（4 字汉字全部统计）与普通词（count > 2 才展示）
@@ -249,8 +261,23 @@ docker build -t fenbi-helper .
 docker run -d -p 3000:3000 -v $(pwd)/cache:/app/cache fenbi-helper
 ```
 
+### 局域网访问（平板/手机）
+- 服务默认监听 `0.0.0.0:3000`，启动时会打印本机与局域网 IP
+- 平板/手机与电脑连接**同一 WiFi**，浏览器打开 `http://<电脑IP>:3000` 即可访问
+- Windows 需添加防火墙入站规则放行 3000 端口（以管理员身份运行 PowerShell）：
+  ```powershell
+  New-NetFirewallRule -DisplayName "fenbi-helper-3000" -Direction Inbound -Protocol TCP -LocalPort 3000 -Action Allow -Profile Private
+  ```
+- 建议在路由器为电脑绑定固定 IP（DHCP 静态分配），避免重启后 IP 变化
+
 ## 历史更新
 
+- **2026-07-07** 题库软删除/回收站机制：卸载题库不再直接删除文件，改为移动到 `.deleted-quizzes/` 目录并记录元数据到 `trash.json`，保留 2 天可恢复；quizLoader.js 新增 `moveToTrash` / `restoreFromTrash` / `listTrash` / `cleanupTrash` 四个函数，`loadAll()` 启动时调用 `cleanupTrash()` 永久删除超期项；app.js `/api/quiz/uninstall` 路由从永久删除改为 `moveToTrash()`，新增 `GET /api/quiz/trash`（列出可恢复题库）和 `POST /api/quiz/restore`（恢复题库）路由；quiz-list.ejs 分类页底部新增可折叠「回收站」区域（每项显示题库名、删除时间、剩余恢复小时数），`uninstallQuiz()` 确认提示更新为「移入回收站，2 天内可恢复，超期永久删除」
+- **2026-07-07** 设备指纹识别：新增 `src/views/js/device.js`，收集 Canvas 指纹 + WebGL 指纹 + UA/屏幕/时区等 10 项特征，FNV-1a 双重 hash 输出 16 位 hex 存入 localStorage + 10 年 cookie；重写 XHR 和 fetch 自动注入 `X-Device-Id` header；app.js 新增 HTML 自动注入中间件（在 `</body>` 前注入 device.js）+ 设备识别中间件（注入 `ctx.deviceId`，访问日志含 deviceId）；history-category-complex.ejs navbar 显示指纹前 8 位徽章
+- **2026-07-06** 项目不再内置题库：`QUIZ_DIRS` 改为空数组，移除片段阅读600题、花生逻辑推理600题、红领巾言语理解600题三个内置配置；所有题库均通过上传功能添加，配置持久化到 `uploaded-quizzes/config.json`；启动时自动清理目录不存在的动态配置；新增 `start.bat` 启动脚本（自动检查 Node.js、首次运行 `npm install`、显示本机与局域网访问地址）
+- **2026-07-06** 服务监听改为 `0.0.0.0:3000` 支持局域网访问：平板/手机连接同一 WiFi 后浏览器打开 `http://<电脑IP>:3000` 即可刷题；启动时自动打印本机与局域网 IPv4 地址；需配合 Windows 防火墙入站规则放行 3000 端口（Private 配置文件）
+- **2026-07-06** 词语统计/词语频次/公文格式三个页面卡片展开动画优化：弹窗面板从 `display:none→block` 改为 `opacity+visibility` 过渡，修复再次打开时动画不触发的问题；遮罩层 0.25s 淡入，内容面板 `scale(0.92)+translateY(20px) → scale(1)+translateY(0)` 0.4s 弹簧曲线；三个页面卡片 hover 增强：上浮 3-4px + 蓝色边框 + 蓝色阴影，active 回落，限定 `.visible` 类避免与入场动画冲突
+- **2026-07-06** quiz-play.ejs 新增方向键左右切换题目：监听 `keydown` 事件，`ArrowLeft` → `goPrev()`，`ArrowRight` → `goNext()`（末题打开提交确认弹窗）；焦点在 INPUT/TEXTAREA/SELECT 时跳过避免输入冲突。同时完善上传弹窗格式规范：新增「三、md 题库规范」章节（7 个元素说明：`## 填空题/解答题/选择题` 二级标题、`### 第 X 题` 三级标题、四个加粗字段、`---` 分隔线），原「文件与文件夹」顺延为「四」；文件夹选择按钮提示文字更新为「含 xlsx / apkg / md」
 - **2026-07-06** 新增无选项题（填空/解答题）答题界面支持：quizLoader.js 新增 `parseMdFile()` 解析 Markdown 题库（`### 第 X 题` 拆题 + `**考点**/**题目**/**答案**/**解析**` 字段提取，`## 填空题/解答题/选择题` 二级标题切换题型，自动剥离「（本题满分 X 分）」前缀），`loadDir` 新增 md 分支；app.js `/api/quiz/upload-folder` 路由支持 `.md` 文件（按数量多数原则检测主扩展名），`/quiz/:setId/submit` 提交判分中无选项题（`options.length === 0`）跳过判分，`correct = null` 不计入对错与未答统计；quiz-play.ejs `renderQuestion()` 检测 `isNoOpt`，无选项题渲染「▸ 显示答案」按钮 + 答案/解析面板（默认隐藏），新增 `toggleAnswer(qNo)` 函数控制展开/收起 + KaTeX 公式补渲染，`updateStatus()` / `renderDots()` / `openSubmitDialog()` 仅统计有选项题，导航点用 `.no-opt` 淡紫色独立样式；quiz-result.ejs 无选项题状态显示「已查看」紫色徽章（`.status-viewed` + `.q-item.viewed`），答案行改为「参考答案：xxx」不显示「我的答案」；quiz-list.ejs 前端文件选择器支持 `.md` 文件，状态文本显示 `xlsx X / apkg Y / md Z`
 - **2026-07-06** 列表视图新增「重做当日错题」功能：新增后端路由 `POST /api/quiz/redo`，调用 `getDailyWrongStats` 获取错题（支持 `exerciseIds` 按练习过滤），转换为 quiz-play 格式后通过 `quizLoader.registerCustomSet` 注册为 `custom_redo_<date>_<ts>` 内存题集，前端跳转 `/quiz/<setId>` 进入做题页；history.ejs 每日分组新增「重做当日错题」蓝色按钮，与「导出当日错题」并列；复选框选择时按钮切换为「重做所选错题 N」高亮态。同时新增「按练习勾选导出当日错题」：每个练习行新增复选框，勾选后「导出当日错题」按钮变高亮显示「导出所选错题 N」；`getDailyWrongStats` 新增第三参数 `exerciseIds` 按练习 ID 过滤；`/api/export-daily-wrong-pdf` 改为 `Content-Disposition: attachment` 下载方式（沿用 `/api/quiz/export-pdf` 路径），文件名 `日期-当日错题.pdf` 或 `日期-错题(所选N个练习).pdf`
 - **2026-07-06** 修复考研数学题库 LaTeX 渲染不完全：题库中大量使用非标准 `[matrix]`（274 处）和 `⎩⎨⎧` Unicode 分段括号（16 处）代替标准 LaTeX 环境；新增 `fixNonStandardMath()` 函数在 quizLoader 加载时自动转换——`⎩⎨⎧[matrix]` / `{[matrix]` → `\begin{cases}`，`([matrix]` → `\begin{pmatrix}`，裸 `[matrix]` → `\begin{matrix}`；token 扫描自动补全 `\end{...}` 闭合标签；7 个题套共修复 86 处，0 残留

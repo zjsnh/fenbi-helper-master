@@ -75,6 +75,9 @@ local-quiz-bank/
 # 上传的题库文件（用户数据，不推送）
 uploaded-quizzes/
 
+# 回收站（软删除题库暂存，含用户题库数据，不推送）
+.deleted-quizzes/
+
 # OCR 源数据（体积大，非代码，不推送）
 *_by_PaddleOCR*.md
 

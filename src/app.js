@@ -40,14 +40,34 @@ app.use(koaBody({
     }
 }))
 
-// 动态页面禁止浏览器缓存，确保数据始终最新
+// 动态页面禁止浏览器缓存，确保数据始终最新；同时注入设备指纹脚本
 app.use(async (ctx, next) => {
     await next();
     if (ctx.method === 'GET' && ctx.status === 200 && ctx.type === 'text/html') {
         ctx.set('Cache-Control', 'no-store, no-cache, must-revalidate');
         ctx.set('Pragma', 'no-cache');
         ctx.set('Expires', '0');
+        // 在 </body> 前注入设备指纹生成脚本（仅注入一次）
+        if (typeof ctx.body === 'string' && ctx.body.indexOf('</body>') >= 0 && ctx.body.indexOf('/js/device.js') < 0) {
+            ctx.body = ctx.body.replace('</body>', '<script src="/js/device.js"></script></body>');
+        }
     }
+});
+
+// 设备识别中间件：从 X-Device-Id header 或 cookie 读取设备指纹
+app.use(async (ctx, next) => {
+    let deviceId = ctx.headers['x-device-id'] || '';
+    if (!deviceId && ctx.headers.cookie) {
+        const m = ctx.headers.cookie.match(/device_id=([a-f0-9]{16})/);
+        if (m) deviceId = m[1];
+    }
+    ctx.deviceId = deviceId || 'unknown';
+    ctx.state.deviceId = ctx.deviceId;
+    // 打印访问日志（仅 HTML 页面，API 由各路由自行决定是否记录）
+    if (ctx.method === 'GET' && !ctx.path.startsWith('/js/') && !ctx.path.startsWith('/quiz-img/') && ctx.path !== '/logo.svg' && ctx.path !== '/theme.css') {
+        console.log('[Access] ' + ctx.ip + ' | ' + ctx.deviceId + ' | ' + ctx.method + ' ' + ctx.path);
+    }
+    await next();
 });
 
 app.use(async(ctx, next) => {
@@ -78,7 +98,21 @@ app.use(async(ctx, next) => {
     }
 });
 
-app.listen(3000);
+app.listen(3000, '0.0.0.0', () => {
+    console.log('服务已启动：');
+    console.log('  本机访问  → http://localhost:3000');
+    // 打印局域网 IP，方便平板/手机访问
+    try {
+        const nets = require('os').networkInterfaces();
+        Object.keys(nets).forEach(name => {
+            nets[name].forEach(iface => {
+                if (iface.family === 'IPv4' && !iface.internal) {
+                    console.log('  局域网访问 → http://' + iface.address + ':3000');
+                }
+            });
+        });
+    } catch (e) {}
+});
 
 
 // 来源页白名单：仅允许 from 参数跳转到这些页面，防止开放重定向
@@ -729,7 +763,7 @@ router.post('/api/quiz/upload-folder', async ctx => {
     }
 });
 
-// 卸载上传的题库（按 source 删除）
+// 卸载上传的题库（软删除：移入回收站，2 天内可恢复）
 router.post('/api/quiz/uninstall', async ctx => {
     try {
         const { source } = ctx.request.body;
@@ -744,22 +778,51 @@ router.post('/api/quiz/uninstall', async ctx => {
             ctx.body = { code: 404, message: '未找到该题库配置，可能为内置题库，无法卸载' };
             return;
         }
-        // 从配置中提取文件夹名（dir 形如 uploaded-quizzes/xxx）
         const folderName = path.basename(cfg.dir);
-        // 删除磁盘文件
-        const dirPath = path.join(__dirname, '..', cfg.dir);
-        if (fs.existsSync(dirPath)) {
-            fs.rmSync(dirPath, { recursive: true, force: true });
+        const result = quizLoader.moveToTrash(folderName);
+        if (result.error) {
+            ctx.body = { code: 500, message: result.error };
+            return;
         }
-        // 删除动态配置
-        quizLoader.removeUploadedConfig(folderName);
         // 重新加载
         await quizLoader.reload();
-        ctx.body = { code: 0, message: '已卸载题库：' + source };
+        ctx.body = { code: 0, message: '已移入回收站：' + source + '（2 天内可恢复）' };
     } catch (err) {
         console.error('[uninstall] 失败:', err.message, err.stack);
         ctx.status = 500;
         ctx.body = { code: 500, message: '卸载失败: ' + err.message };
+    }
+});
+
+// 列出回收站内可恢复的题库
+router.get('/api/quiz/trash', async ctx => {
+    try {
+        const trash = quizLoader.listTrash();
+        ctx.body = { code: 0, trash };
+    } catch (err) {
+        ctx.body = { code: 500, message: err.message };
+    }
+});
+
+// 从回收站恢复题库
+router.post('/api/quiz/restore', async ctx => {
+    try {
+        const { folderName } = ctx.request.body;
+        if (!folderName) {
+            ctx.body = { code: 400, message: '缺少 folderName 参数' };
+            return;
+        }
+        const result = quizLoader.restoreFromTrash(folderName);
+        if (result.error) {
+            ctx.body = { code: 500, message: result.error };
+            return;
+        }
+        await quizLoader.reload();
+        ctx.body = { code: 0, message: '已恢复题库：' + result.source };
+    } catch (err) {
+        console.error('[restore] 失败:', err.message, err.stack);
+        ctx.status = 500;
+        ctx.body = { code: 500, message: '恢复失败: ' + err.message };
     }
 });
 

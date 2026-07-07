@@ -439,6 +439,94 @@
       vertical-align: middle; margin-right: 6px;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── 回收站（软删除暂存区）── */
+    .trash-section {
+      margin-top: 36px;
+      padding-top: 20px;
+      border-top: 0.5px dashed var(--border-light, #e2e8f0);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.5s var(--ease-out), transform 0.5s var(--ease-out);
+    }
+    .trash-section.visible { opacity: 1; transform: translateY(0); }
+    .trash-section.empty { display: none; }
+    .trash-header {
+      display: flex; align-items: center; gap: 8px;
+      cursor: pointer; user-select: none;
+      padding: 8px 4px; border-radius: 8px;
+      transition: background 0.2s;
+    }
+    .trash-header:hover { background: var(--paper, #f7f8fa); }
+    .trash-icon { font-size: 16px; color: var(--text-ter, #94a3b8); }
+    .trash-title { font-size: 14px; font-weight: 700; color: var(--text-sec, #475569); font-family: var(--font-display); }
+    .trash-count {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 22px; height: 22px; padding: 0 7px;
+      background: #fef0ee; color: #c0392b;
+      border: 1px solid #fca5a5; border-radius: 980px;
+      font-size: 11px; font-weight: 700; font-family: var(--font-mono);
+    }
+    .trash-toggle {
+      margin-left: auto; font-size: 12px; color: var(--text-ter, #94a3b8);
+      transition: transform 0.25s;
+    }
+    .trash-section.expanded .trash-toggle { transform: rotate(90deg); }
+    .trash-hint {
+      font-size: 11px; color: var(--text-ter, #94a3b8);
+      margin: 4px 4px 12px; line-height: 1.6;
+    }
+    .trash-list {
+      display: none; flex-direction: column; gap: 8px;
+      max-width: 720px;
+    }
+    .trash-section.expanded .trash-list { display: flex; animation: fadeIn 0.3s ease; }
+    .trash-card {
+      display: flex; align-items: center; gap: 12px;
+      background: var(--paper, #f7f8fa);
+      border: 0.5px solid var(--border-light, #e2e8f0);
+      border-radius: 10px; padding: 12px 16px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .trash-card:hover { border-color: #fca5a5; background: #fef9f8; }
+    .trash-card .t-name {
+      font-size: 14px; font-weight: 700; color: #0a1628;
+      font-family: var(--font-display); flex: 0 1 auto; min-width: 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .trash-card .t-ext {
+      font-size: 10px; padding: 1px 6px; border-radius: 4px;
+      background: #fff; color: var(--text-ter, #94a3b8);
+      border: 1px solid var(--border-light, #e2e8f0);
+      font-family: var(--font-mono); text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .trash-card .t-meta {
+      flex: 1; min-width: 0; display: flex; gap: 12px;
+      font-size: 11.5px; color: var(--text-ter, #94a3b8);
+      align-items: center; justify-content: flex-end;
+    }
+    .trash-card .t-time { white-space: nowrap; }
+    .trash-card .t-remain {
+      color: #b8860b; font-weight: 600; white-space: nowrap;
+      padding: 2px 8px; background: #fff5e6; border-radius: 8px;
+      border: 1px solid #ffdbb0;
+    }
+    .trash-card .t-remain.urgent { color: #c0392b; background: #fef0ee; border-color: #fca5a5; }
+    .trash-card .t-restore {
+      flex-shrink: 0; padding: 6px 14px;
+      background: #fff; border: 1px solid var(--g-400, #3399ff);
+      color: var(--g-700, #0052a3); border-radius: 980px;
+      font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit;
+      transition: all 0.2s;
+    }
+    .trash-card .t-restore:hover { background: var(--g-600, #0066cc); color: #fff; border-color: var(--g-600, #0066cc); }
+    .trash-card .t-restore:disabled { opacity: 0.5; cursor: not-allowed; }
+    .trash-empty-mini {
+      padding: 16px; text-align: center;
+      font-size: 12px; color: var(--text-ter, #94a3b8);
+      background: var(--paper, #f7f8fa); border-radius: 8px;
+    }
   </style>
 </head>
 <body>
@@ -470,6 +558,18 @@
     </div>
 
     <div class="cat-grid" id="catGrid"></div>
+
+    <!-- 回收站：软删除题库暂存区，2 天内可恢复 -->
+    <div class="trash-section empty" id="trashSection">
+      <div class="trash-header" onclick="toggleTrash()">
+        <span class="trash-icon">&#128230;</span>
+        <span class="trash-title">回收站</span>
+        <span class="trash-count" id="trashCount">0</span>
+        <span class="trash-toggle">&#x25B6;</span>
+      </div>
+      <div class="trash-hint" id="trashHint" style="display:none;">卸载的题库会在此保留 2 天，超期将永久删除且不可恢复。</div>
+      <div class="trash-list" id="trashList"></div>
+    </div>
   </div>
 
   <!-- 第二级：题套列表页 -->
@@ -548,7 +648,28 @@
         </div>
 
         <div class="fmt-block">
-          <div class="fmt-title">三、文件与文件夹</div>
+          <div class="fmt-title">三、md 题库规范 <span class="fmt-tag">填空/解答题</span></div>
+          <table class="fmt-table">
+            <thead>
+              <tr><th style="width:24%;">元素</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="col-field">## 填空题 / ## 解答题 / ## 选择题</td><td class="col-desc">二级标题，划分题型章节；后续题目自动归入最近一个章节的题型（章节标题去掉「题」字作为题型字段）</td></tr>
+              <tr><td class="col-field">### 第 X 题</td><td class="col-desc">三级标题，X 为题号（数字）；可选括号附标题如「### 第 11 题（多元函数积分学）」；每个三级标题切分一道题</td></tr>
+              <tr><td class="col-field">**考点**：xxx</td><td class="col-desc">加粗字段名 + 中文/英文冒号；内容作为知识点标签（选填）</td></tr>
+              <tr><td class="col-field">**题目**：xxx</td><td class="col-desc">加粗字段名 + 冒号；题目正文，支持 LaTeX 公式（<code>$...$</code> 行内、<code>$$...$$</code> 块级）；开头若有「（本题满分 X 分）」会自动剥离</td></tr>
+              <tr><td class="col-field">**答案**：xxx</td><td class="col-desc">加粗字段名 + 冒号；答案文本（可含 LaTeX）；做题页通过「显示答案」按钮展开查看，不参与判分</td></tr>
+              <tr><td class="col-field">**解析**：xxx</td><td class="col-desc">加粗字段名 + 冒号；解析文本（可含 LaTeX）；答案面板展开时同步显示，KaTeX 自动渲染</td></tr>
+              <tr><td class="col-field">---</td><td class="col-desc">题目之间的分隔线（可选，解析末尾）；解析器自动识别并剥离</td></tr>
+            </tbody>
+          </table>
+          <div class="fmt-note">
+            md 题库用于无选项题型（填空/解答题），<code>options</code> 字段为空数组，做题页不渲染选项区，改为「▸ 显示答案」按钮 + 答案/解析面板（默认隐藏）；提交判分时跳过判分（<code>correct = null</code>），结果页显示「已查看」紫色徽章。每个 <code>.md</code> 文件即一个题套。
+          </div>
+        </div>
+
+        <div class="fmt-block">
+          <div class="fmt-title">四、文件与文件夹</div>
           <table class="fmt-table">
             <thead>
               <tr><th style="width:24%;">项目</th><th>说明</th></tr>
@@ -573,7 +694,7 @@
       <label class="form-label">选择题库文件夹</label>
       <label class="folder-pick" id="folderPick" for="folderInput">
         <span class="folder-pick-icon">&#128193;</span>
-        <span class="folder-pick-text" id="folderPickText">点击选择文件夹（含 xlsx / apkg）</span>
+        <span class="folder-pick-text" id="folderPickText">点击选择文件夹（含 xlsx / apkg / md）</span>
         <input type="file" id="folderInput" webkitdirectory directory multiple style="display:none">
       </label>
     </div>
@@ -758,9 +879,9 @@ function startCustomQuiz() {
   window.location.href = url;
 }
 
-// 卸载题库
+// 卸载题库（软删除：移入回收站，2 天内可恢复，超期永久删除）
 function uninstallQuiz(source) {
-  if (!confirm('确定要卸载题库「' + source + '」吗？\n该操作会删除已上传的文件，且不可恢复。')) return;
+  if (!confirm('确定要卸载题库「' + source + '」吗？\n该操作会移入回收站，2 天内可在页面底部「回收站」中恢复；超过 2 天将永久删除且不可恢复。')) return;
   fetch('/api/quiz/uninstall', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -774,6 +895,77 @@ function uninstallQuiz(source) {
     }
   }).catch(function(e) {
     alert('卸载失败：' + e.message);
+  });
+}
+
+// ── 回收站 ──
+// 拉取回收站列表，渲染到分类页底部
+function loadTrash() {
+  fetch('/api/quiz/trash').then(function(r) { return r.json(); }).then(function(res) {
+    if (res.code !== 0) return;
+    var list = res.trash || [];
+    var section = document.getElementById('trashSection');
+    var countEl = document.getElementById('trashCount');
+    var listEl = document.getElementById('trashList');
+    var hintEl = document.getElementById('trashHint');
+    if (list.length === 0) {
+      section.classList.add('empty');
+      section.classList.remove('visible', 'expanded');
+      hintEl.style.display = 'none';
+      return;
+    }
+    section.classList.remove('empty');
+    section.classList.add('visible');
+    hintEl.style.display = 'block';
+    countEl.textContent = list.length;
+
+    var html = '';
+    list.forEach(function(t) {
+      var urgent = t.remainingHours <= 12;
+      var remainText = t.remainingHours > 0
+        ? '剩余 ' + t.remainingHours + ' 小时'
+        : '即将永久删除';
+      html += '<div class="trash-card">';
+      html += '<div class="t-name" title="' + escapeAttr(t.source) + '">' + t.source + '</div>';
+      if (t.ext) html += '<span class="t-ext">' + t.ext + '</span>';
+      html += '<div class="t-meta">';
+      html += '<span class="t-time">删除于 ' + t.deletedTime + '</span>';
+      html += '<span class="t-remain' + (urgent ? ' urgent' : '') + '">' + remainText + '</span>';
+      html += '</div>';
+      html += '<button class="t-restore" onclick="restoreQuiz(\'' + escapeAttr(t.folderName) + '\', this)">恢复</button>';
+      html += '</div>';
+    });
+    listEl.innerHTML = html;
+  }).catch(function(e) {
+    console.warn('回收站加载失败:', e.message);
+  });
+}
+
+// 展开/收起回收站
+function toggleTrash() {
+  var section = document.getElementById('trashSection');
+  section.classList.toggle('expanded');
+}
+
+// 恢复题库
+function restoreQuiz(folderName, btn) {
+  if (!confirm('确定从回收站恢复此题库吗？\n恢复后将重新出现在分类列表中。')) return;
+  if (btn) { btn.disabled = true; btn.textContent = '恢复中...'; }
+  fetch('/api/quiz/restore', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ folderName: folderName })
+  }).then(function(r) { return r.json(); }).then(function(res) {
+    if (res.code === 0) {
+      alert(res.message);
+      window.location.reload();
+    } else {
+      alert('恢复失败：' + (res.message || '未知错误'));
+      if (btn) { btn.disabled = false; btn.textContent = '恢复'; }
+    }
+  }).catch(function(e) {
+    alert('恢复失败：' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = '恢复'; }
   });
 }
 
@@ -835,6 +1027,7 @@ function backToCategory() {
 
 // 初始化
 renderCategory();
+loadTrash();
 
 // ── 上传题库相关 ──
 var selectedFiles = [];
@@ -853,7 +1046,7 @@ function resetUploadForm() {
   document.getElementById('uploadSource').value = '';
   document.getElementById('folderInput').value = '';
   document.getElementById('folderPick').classList.remove('has-files');
-  document.getElementById('folderPickText').textContent = '点击选择文件夹（含 xlsx / apkg）';
+  document.getElementById('folderPickText').textContent = '点击选择文件夹（含 xlsx / apkg / md 文件）';
   document.getElementById('uploadSubmit').disabled = true;
   hideResult();
   // 默认折叠格式详情

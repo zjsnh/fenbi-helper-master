@@ -336,7 +336,22 @@
   <a href="/quiz">本地题库</a>
   <a href="/shenlun-format">公文格式</a>
   <a href="/setup" style="margin-left:auto;">切换账号</a>
+  <span id="deviceBadge" style="font-size:10px;color:var(--ink-400);padding:3px 8px;border:0.5px solid var(--g-200);border-radius:6px;font-family:var(--font-mono, monospace);" title="当前设备指纹">设备 -</span>
 </div>
+<script>
+  // 由 device.js 写入 window.__DEVICE_ID__，此处兜底展示
+  (function () {
+    function show() {
+      var id = window.__DEVICE_ID__ || (window.getDeviceId && window.getDeviceId());
+      if (id) {
+        var el = document.getElementById('deviceBadge');
+        if (el) el.textContent = '设备 ' + id.slice(0, 8);
+      }
+    }
+    if (window.__DEVICE_ID__) show();
+    else document.addEventListener('DOMContentLoaded', function () { setTimeout(show, 100); });
+  })();
+</script>
 
 <div class="container-wide">
   <% if (exerciseHistory.length == 0) { %><script>window.location='/setup'</script><% } %>

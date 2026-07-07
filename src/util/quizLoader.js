@@ -11,13 +11,16 @@ const ROOT = path.join(__dirname, '..', '..');
 const UPLOADED_BASE = 'uploaded-quizzes';
 const UPLOADED_CONFIG_FILE = path.join(ROOT, UPLOADED_BASE, 'config.json');
 
+// 回收站：软删除题库暂存目录（项目根下，已 gitignore）
+// 卸载的题库文件夹移动到此目录，trash.json 记录元数据；超过 2 天自动永久删除
+const TRASH_BASE = '.deleted-quizzes';
+const TRASH_FILE = path.join(ROOT, TRASH_BASE, 'trash.json');
+const TRASH_RETENTION_MS = 2 * 24 * 60 * 60 * 1000; // 2 天
+
 // 题库目录配置（source 用完整文件夹名作为分类标题）
-// ext: 文件扩展名（xlsx / apkg）
-const QUIZ_DIRS = [
-  { dir: '【1】片段阅读600题题库', source: '【1】片段阅读600题题库', prefix: 'fr', ext: 'xlsx' },
-  { dir: '【5】花生逻辑推理600题题库', source: '【5】花生逻辑推理600题题库', prefix: 'lr', ext: 'xlsx' },
-  { dir: '【4】红领巾言语理解600题', source: '【4】红领巾言语理解600题', prefix: 'hlj', ext: 'apkg' }
-];
+// ext: 文件扩展名（xlsx / apkg / md）
+// 项目不内置题库，所有题库均通过上传功能添加，配置持久化到 uploaded-quizzes/config.json
+const QUIZ_DIRS = [];
 
 // 读取上传题库的动态配置
 function loadDynamicConfigs() {
@@ -517,8 +520,34 @@ async function loadAll() {
   if (setsMap.size > 0) return; // 已加载
   console.log('[quizLoader] 开始加载题库...');
 
+  // 启动时清理回收站中超过 2 天的题库（永久删除）
+  const trashResult = cleanupTrash();
+  if (trashResult.cleaned > 0) {
+    console.log('[quizLoader] 回收站清理：永久删除 ' + trashResult.cleaned + ' 个超期题库');
+  }
+
+  // 加载动态配置，清理目录不存在的项（用户手动删除文件夹后自动移除配置）
+  let dynamicConfigs = loadDynamicConfigs();
+  if (dynamicConfigs.length > 0) {
+    const validConfigs = [];
+    const removedConfigs = [];
+    dynamicConfigs.forEach(c => {
+      const dirPath = path.join(ROOT, c.dir);
+      if (fs.existsSync(dirPath)) {
+        validConfigs.push(c);
+      } else {
+        removedConfigs.push(c);
+        console.log('[quizLoader] 题库目录不存在，移除配置: ' + c.dir + ' (' + c.source + ')');
+      }
+    });
+    if (removedConfigs.length > 0) {
+      saveDynamicConfigs(validConfigs);
+      console.log('[quizLoader] 已清理 ' + removedConfigs.length + ' 个失效配置');
+    }
+    dynamicConfigs = validConfigs;
+  }
+
   // 合并静态配置 + 动态配置（上传的题库）
-  const dynamicConfigs = loadDynamicConfigs();
   const allConfigs = QUIZ_DIRS.concat(dynamicConfigs);
 
   // 初始化 sql.js（用于解析 apkg）
@@ -552,6 +581,134 @@ function removeUploadedConfig(folderName) {
   configs.splice(idx, 1);
   saveDynamicConfigs(configs);
   return removed;
+}
+
+// ── 回收站（软删除）──
+// 卸载时不直接删除，移动到 .deleted-quizzes/ 并记录元数据，2 天内可恢复
+
+function loadTrash() {
+  if (!fs.existsSync(TRASH_FILE)) return [];
+  try {
+    return JSON.parse(fs.readFileSync(TRASH_FILE, 'utf-8'));
+  } catch (e) {
+    console.log('[quizLoader] 读取回收站失败: ' + e.message);
+    return [];
+  }
+}
+
+function saveTrash(trash) {
+  const trashDir = path.join(ROOT, TRASH_BASE);
+  if (!fs.existsSync(trashDir)) fs.mkdirSync(trashDir, { recursive: true });
+  fs.writeFileSync(TRASH_FILE, JSON.stringify(trash, null, 2));
+}
+
+// 列出回收站内可恢复的题库
+function listTrash() {
+  return loadTrash().map(t => ({
+    source: t.source,
+    folderName: t.folderName,
+    ext: t.ext,
+    deletedAt: t.deletedAt,
+    deletedTime: new Date(t.deletedAt).toLocaleString('zh-CN'),
+    remainingHours: Math.max(0, Math.floor((TRASH_RETENTION_MS - (Date.now() - t.deletedAt)) / 3600000))
+  }));
+}
+
+// 将题库移入回收站（移动文件夹 + 记录元数据，从动态配置中移除）
+function moveToTrash(folderName) {
+  const configs = loadDynamicConfigs();
+  const dirRel = path.join(UPLOADED_BASE, folderName);
+  const idx = configs.findIndex(c => c.dir === dirRel);
+  if (idx < 0) return { error: '未找到该题库配置' };
+  const cfg = configs[idx];
+  const srcPath = path.join(ROOT, cfg.dir);
+  if (!fs.existsSync(srcPath)) return { error: '题库目录不存在' };
+
+  // 移动到回收站目录
+  const trashDir = path.join(ROOT, TRASH_BASE);
+  if (!fs.existsSync(trashDir)) fs.mkdirSync(trashDir, { recursive: true });
+  const destPath = path.join(trashDir, folderName);
+  // 若目标已存在（同名的旧残留），先清空
+  if (fs.existsSync(destPath)) fs.rmSync(destPath, { recursive: true, force: true });
+  fs.renameSync(srcPath, destPath);
+
+  // 从动态配置中移除
+  configs.splice(idx, 1);
+  saveDynamicConfigs(configs);
+
+  // 记录到 trash.json
+  const trash = loadTrash();
+  trash.push({
+    source: cfg.source,
+    folderName,
+    dir: cfg.dir,
+    ext: cfg.ext,
+    prefix: cfg.prefix,
+    deletedAt: Date.now()
+  });
+  saveTrash(trash);
+  console.log('[quizLoader] 题库已移入回收站: ' + cfg.source + ' (2 天内可恢复)');
+  return { ok: true, source: cfg.source };
+}
+
+// 从回收站恢复题库（移动文件夹回 uploaded-quizzes/，恢复动态配置）
+function restoreFromTrash(folderName) {
+  const trash = loadTrash();
+  const idx = trash.findIndex(t => t.folderName === folderName);
+  if (idx < 0) return { error: '回收站中未找到该题库' };
+  const item = trash[idx];
+  const trashPath = path.join(ROOT, TRASH_BASE, folderName);
+  if (!fs.existsSync(trashPath)) {
+    // 文件夹不存在，清理 trash 记录
+    trash.splice(idx, 1);
+    saveTrash(trash);
+    return { error: '回收站文件已丢失，已清理记录' };
+  }
+
+  // 恢复到 uploaded-quizzes/
+  const destPath = path.join(ROOT, UPLOADED_BASE, folderName);
+  if (fs.existsSync(destPath)) fs.rmSync(destPath, { recursive: true, force: true });
+  fs.renameSync(trashPath, destPath);
+
+  // 恢复动态配置
+  const configs = loadDynamicConfigs();
+  configs.push({
+    dir: path.join(UPLOADED_BASE, folderName),
+    source: item.source,
+    prefix: item.prefix,
+    ext: item.ext
+  });
+  saveDynamicConfigs(configs);
+
+  // 从 trash 中移除
+  trash.splice(idx, 1);
+  saveTrash(trash);
+  console.log('[quizLoader] 题库已从回收站恢复: ' + item.source);
+  return { ok: true, source: item.source };
+}
+
+// 清理回收站中超过保留期的题库（永久删除）
+function cleanupTrash() {
+  const trash = loadTrash();
+  if (trash.length === 0) return { cleaned: 0 };
+  const now = Date.now();
+  const remaining = [];
+  let cleaned = 0;
+  trash.forEach(t => {
+    if (now - t.deletedAt > TRASH_RETENTION_MS) {
+      // 超过 2 天，永久删除
+      const trashPath = path.join(ROOT, TRASH_BASE, t.folderName);
+      if (fs.existsSync(trashPath)) {
+        fs.rmSync(trashPath, { recursive: true, force: true });
+      }
+      cleaned++;
+      console.log('[quizLoader] 回收站超期永久删除: ' + t.source + ' (删除于 ' + new Date(t.deletedAt).toLocaleString('zh-CN') + ')');
+    } else {
+      remaining.push(t);
+    }
+  });
+  if (cleaned > 0) saveTrash(remaining);
+  return { cleaned };
 }
 
 // 判断某个 source 是否为上传题库（动态配置）
@@ -694,4 +851,4 @@ function getSourceBySetIdSync(setId) {
   return s ? s.source : '';
 }
 
-module.exports = { loadAll, listSets, getSet, getQuestion, reload, addUploadedConfig, loadDynamicConfigs, removeUploadedConfig, isUploadedSource, buildCustomSet, registerCustomSet, getSourceBySetIdSync };
+module.exports = { loadAll, listSets, getSet, getQuestion, reload, addUploadedConfig, loadDynamicConfigs, removeUploadedConfig, isUploadedSource, buildCustomSet, registerCustomSet, getSourceBySetIdSync, moveToTrash, restoreFromTrash, listTrash, cleanupTrash };
