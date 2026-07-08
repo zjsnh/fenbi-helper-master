@@ -278,9 +278,11 @@ node src/app.js
 - 错题判定使用 `!q.correct`（避免 `=== false` 漏掉 `0`/`null`/`undefined` 等 falsy 值）
 - 动态页面禁用浏览器缓存（`Cache-Control: no-store`），确保数据最新
 - 页面返回通过 `?from=` 参数 + 白名单校验，防开放重定向
+- 公开路径白名单：`src/util/auth.js` 的 `PUBLIC_PREFIXES` 白名单含 `/setup`、`/api/login`、`/js/`、`/quiz-img/`、`/theme.css`、`/logo.svg`、`/image.png`、`/favicon.ico`、`/shenlun-format`；白名单内路径不需登录校验，其余路径未登录时页面重定向 `/setup?redirectPath=<原URL>`，API 返回 401
 - 多选题识别统一使用正则 `/多(选|项)/`，兼容"多选"、"多项选择"等变体（前端、后端、quizLoader 三处一致）
 - Koa-router 静态路径必须在参数路径之前注册（如 `/quiz/custom` 必须在 `/quiz/:setId` 之前），否则 "custom" 会被当作 setId 参数
 - EJS 模板必须以 `<!DOCTYPE html>` 开头，否则浏览器进入 quirks mode，KaTeX 检测到后拒绝渲染
+- EJS partial 组件机制：导航栏和页面头部提取为 `src/views/partials/navbar.ejs` 和 `page-hero.ejs` 两个 partial，各页面通过 `<%- include('./partials/navbar.ejs', { activePage: 'xxx' }) %>` 引入；`app.js` 全局变量注入中间件把 `userPhone`/`isAdmin` 写入 `ctx.state`，所有 `ctx.render` 自动携带，partial 内用 `typeof` 检查防御；高亮 class 必须用 `<%- %>`（不转义）输出，`<%= %>` 会把 `"` 转义为 `&#34;` 导致高亮失效
 - 题库图片字段（imageUrl / analysisImageUrl）支持绝对 URL（http/https 直接渲染）与相对路径（配合 `/quiz-img/:source/*` 路由）；多图用 `|` 分隔
 - apkg 题库图片：parseApkgFile 自动解压 `media` 映射的图片到题库目录 `images/` 子目录，题干/解析 HTML 内的相对 `src` 重写为 `/quiz-img/{source}/images/xxx`；`/quiz-img/:source/*` 路由依次查 `local-quiz-bank/` 与 `uploaded-quizzes/`
 - apkg 题干含 HTML 标签（资料分析题常见 `<div>/<b>/<br>/<img>`），quiz-play.ejs / quiz-result.ejs 题干直接 innerHTML 渲染不做转义；结果页题干预览用 `.replace(/<[^>]+>/g, '')` 去标签
