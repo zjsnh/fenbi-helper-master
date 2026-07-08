@@ -12,7 +12,6 @@ const PUBLIC_PREFIXES = [
     '/logo.svg',
     '/image.png',
     '/favicon.ico',
-    '/calc',
     '/shenlun-format'
 ];
 

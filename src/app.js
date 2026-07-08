@@ -248,10 +248,6 @@ router.get('/word-stats', async ctx => {
     await ctx.render('word-stats', {});
 });
 
-router.get('/idioms', async ctx => {
-    await ctx.render('idioms', {});
-});
-
 router.get('/search', async ctx => {
     let cookie = ctx.request.headers['cookie'];
     let modules = await exerciseResult.getSearchModules(cookie);
@@ -288,10 +284,6 @@ router.post('/api/saveNote/:questionId', koaBody(), async ctx => {
     let questionId = ctx.params.questionId;
     let {noteContent} = ctx.request.body;
     ctx.body = await exerciseResult.saveNote(questionId, noteContent, cookie);
-});
-
-router.get('/calc', async ctx => {
-    await ctx.render('calc', {});
 });
 
 router.get('/shenlun-format', async ctx => {
