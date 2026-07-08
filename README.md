@@ -166,7 +166,6 @@ fenbi-helper-master/
 │       ├── word-stats.ejs         # 词语统计页
 │       ├── question.ejs           # 单题详情页
 │       ├── search.ejs            # 搜索页
-│       ├── calc.ejs              # 计算器页
 │       ├── shenlun-format.ejs    # 申论公文格式页
 │       ├── quiz-list.ejs         # 本地题库选择页
 │       ├── quiz-play.ejs         # 本地题库做题页
