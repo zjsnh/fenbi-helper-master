@@ -224,14 +224,12 @@ node src/app.js
 | `/review-plan` | 艾宾浩斯复习规划页（曲线图 + 阶段预测 + 应用计划） |
 | `/word-frequency` | 词语频次统计 |
 | `/word-stats` | 高频词语统计 |
-| `/idioms` | 成语词典 |
 | `/search` | 搜索页 |
 | `/shenlun-format` | 申论公文格式速查 |
 | `/quiz` | 本地题库选择页 |
 | `/quiz/custom` | 自定义出题（勾选题套 + 数量，Fisher-Yates 抽样） |
 | `/quiz/:setId` | 本地题库做题页 |
 | `/quiz-result/:recordId` | 本地题库结果页 |
-| `/quiz-img/:source/*` | 题库图片静态服务（依次在 `local-quiz-bank/` 与 `uploaded-quizzes/` 下查找 `:source/images/...`，防路径穿越） |
 | `/setup` | 登录页 |
 | `/api/wrong-questions/pdf` | 导出错题本 PDF |
 | `/api/exercises/export-pdf` | 按练习记录批量导出错题/未写题目 PDF |
@@ -250,7 +248,14 @@ node src/app.js
 | `/api/quiz/review/apply-plan` | 艾宾浩斯复习规划：把模拟计划写入 `nextReviewTime`（保留 stage，仅重排时间） |
 | `/api/word-frequency/refresh` | 手动刷新词语统计缓存 |
 | `/api/wrong-questions-by-ids` | 按 ID 批量获取题目详情 |
-| `/api/debug/exercises` | 调试接口（探查分类与练习数据） |
+| `/api/wrong-questions/:keypointId` | 按知识点获取错题列表 |
+| `/api/wrong-questions/refresh` | 刷新错题本缓存 |
+| `/api/collect/:questionId` | 收藏/取消收藏题目 |
+| `/api/video/:questionId` | 获取题目讲解视频 |
+| `/api/comment/:questionId` | 获取题目评论 |
+| `/api/zj` | 造句查询（zaojv.com） |
+| `/api/saveNote/:questionId` | 保存题目笔记 |
+| `/api/word-frequency` | 获取词语频次统计（JSON） |
 
 ## 数据与缓存
 
